@@ -5,5 +5,5 @@ use TmrEcosystem\Inventory\Presentation\Http\Controllers\InventoryDashboardContr
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Inventory Routes
-    Route::get('/inventory', InventoryDashboardController::class)->name('inventory.dashboard');
 });
+Route::get('/inventory', InventoryDashboardController::class)->name('inventory.dashboard');
