@@ -12,7 +12,7 @@ class InventoryDashboardController extends Controller
 {
     public function __invoke(): Response
     {
-        // 1. ดึงข้อมูลสินค้า (เหมือนเดิม)
+        // 1. Items (เหมือนเดิม)
         $items = InventoryItem::with(['category', 'uom', 'stockQuants' => function ($query) {
             $query->whereHas('location', function ($q) {
                 $q->where('usage', 'internal');
@@ -29,19 +29,16 @@ class InventoryDashboardController extends Controller
             ];
         });
 
-        // 2. 👇 เพิ่มส่วนนี้: ดึงรายการ "รอรับเข้า" (Incoming Pending)
-        // คือ Move ที่สถานะ 'confirmed' และวิ่งเข้าคลังเรา (Internal)
+        // 2. Incoming Moves (ของเข้า - เหมือนเดิม)
         $incomingMoves = StockMove::with(['item.uom', 'sourceLocation'])
-            ->where('state', 'confirmed') // ต้องสะกดถูกต้อง confirmed
-            ->whereHas('destinationLocation', function($q) {
-                $q->where('usage', 'internal'); // ต้องเป็น internal
-            })
+            ->where('state', 'confirmed')
+            ->whereHas('destinationLocation', fn($q) => $q->where('usage', 'internal'))
             ->orderBy('date_expected')
             ->get()
             ->map(function ($move) {
                 return [
                     'id' => $move->id,
-                    'item_name' => $move->item->name ?? 'Unknown', // กัน Error
+                    'item_name' => $move->item->name ?? 'Unknown',
                     'qty' => (float) $move->quantity_demand,
                     'uom' => $move->item->uom->symbol ?? 'Unit',
                     'source' => $move->sourceLocation->name ?? 'Unknown',
@@ -49,10 +46,29 @@ class InventoryDashboardController extends Controller
                 ];
             });
 
-        // 3. ส่งข้อมูลไปหน้า View
+        // 3. 👇 เพิ่ม: Outgoing Moves (ของออก - รอส่งลูกค้า)
+        $outgoingMoves = StockMove::with(['item.uom', 'destinationLocation'])
+            ->where('state', 'confirmed')
+            // เงื่อนไข: ออกจาก Internal -> ไป Customer
+            ->whereHas('sourceLocation', fn($q) => $q->where('usage', 'internal'))
+            ->whereHas('destinationLocation', fn($q) => $q->where('usage', 'customer'))
+            ->orderBy('date_expected')
+            ->get()
+            ->map(function ($move) {
+                return [
+                    'id' => $move->id,
+                    'item_name' => $move->item->name ?? 'Unknown',
+                    'qty' => (float) $move->quantity_demand,
+                    'uom' => $move->item->uom->symbol ?? 'Unit',
+                    'destination' => $move->destinationLocation->name ?? 'Customer',
+                    'date' => $move->date_expected ? $move->date_expected->format('Y-m-d') : '-',
+                ];
+            });
+
         return Inertia::render('Inventory/Dashboard', [
             'items' => $items,
-            'incomingMoves' => $incomingMoves, // <--- ส่งตัวแปรนี้เพิ่ม
+            'incomingMoves' => $incomingMoves,
+            'outgoingMoves' => $outgoingMoves,
         ]);
     }
 }

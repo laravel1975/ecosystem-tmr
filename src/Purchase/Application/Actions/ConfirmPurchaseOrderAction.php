@@ -3,55 +3,64 @@
 namespace TmrEcosystem\Purchase\Application\Actions;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use TmrEcosystem\Purchase\Infrastructure\Persistence\Eloquent\Models\PurchaseOrder;
 use TmrEcosystem\Inventory\Application\Actions\CreateStockMoveAction;
 use TmrEcosystem\Inventory\Application\DTOs\StockMoveData;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTransfer;
+use TmrEcosystem\Inventory\Application\Services\DocumentNumberService; // Inject Service
 
 class ConfirmPurchaseOrderAction
 {
     public function __construct(
-        protected CreateStockMoveAction $createStockMoveAction
+        protected CreateStockMoveAction $createStockMoveAction,
+        protected DocumentNumberService $docService
     ) {}
 
     public function execute(PurchaseOrder $po): void
     {
-        // 1. Validation: ต้องเป็น Draft เท่านั้นถึงจะ Confirm ได้
-        if ($po->status !== 'draft') {
-            throw new \Exception("Purchase Order {$po->code} is already confirmed or cancelled.");
-        }
+        if ($po->status !== 'draft') throw new \Exception("PO is not draft");
 
-        // 2. ใช้ Transaction เพื่อความชัวร์ (Data Consistency)
         DB::transaction(function () use ($po) {
-
-            // หา Location ต้นทาง (Supplier) และ ปลายทาง (Warehouse)
-            // *ในระบบจริงอาจจะเลือกจากหน้า UI หรือผูกกับ Vendor*
             $sourceLoc = InventoryLocation::where('usage', 'supplier')->firstOrFail();
             $destLoc = InventoryLocation::where('usage', 'internal')->firstOrFail();
 
-            // 3. วนลูปสร้าง Stock Move ตามรายการสินค้า
-            foreach ($po->lines as $line) {
+            // 1. สร้าง Header เอกสาร (IN26-xxxxxx)
+            $transfer = StockTransfer::create([
+                'uuid' => Str::uuid(),
+                'reference' => $this->docService->generateNextNumber('incoming'),
+                'type' => 'incoming',
+                'source_location_id' => $sourceLoc->id,
+                'destination_location_id' => $destLoc->id,
+                'contact_id' => $po->vendor_id,
+                'status' => 'ready',
+                'scheduled_date' => $po->date_expected ?? now(),
+            ]);
 
+            // 2. สร้าง Lines (Moves)
+            foreach ($po->lines as $line) {
                 $moveData = new StockMoveData(
                     uuid: null,
                     item_id: $line->item_id,
-                    source_location_id: $sourceLoc->id,     // มาจาก Vendor
-                    destination_location_id: $destLoc->id,  // เข้า Stock เรา
-                    quantity_demand: $line->quantity,       // ยอดที่สั่งซื้อ
-                    quantity_done: 0,                       // ยังไม่ได้รับของ (Done = 0)
-                    state: 'confirmed',                     // สถานะ = รอรับของ (Confirmed/Assigned)
+                    source_location_id: $sourceLoc->id,
+                    destination_location_id: $destLoc->id,
+                    quantity_demand: $line->quantity,
+                    quantity_done: 0,
+                    state: 'confirmed', // รอรับ
                     batch_number: null,
                     date_expected: $po->date_expected ?? now()
                 );
 
                 $move = $this->createStockMoveAction->execute($moveData);
 
-                // (Optional) เชื่อมโยงกลับว่า Move นี้มาจาก PO ใบไหน
-                // ถ้าตาราง StockMove มี field 'origin' หรือ Polymorphic relation
-                // $move->update(['origin' => $po->code]);
+                // 3. ผูก Move เข้ากับ Transfer
+                $move->transfer_id = $transfer->id;
+                $move->reference_type = PurchaseOrder::class;
+                $move->reference_id = $po->id;
+                $move->save();
             }
 
-            // 4. อัปเดตสถานะ PO
             $po->update(['status' => 'confirmed']);
         });
     }

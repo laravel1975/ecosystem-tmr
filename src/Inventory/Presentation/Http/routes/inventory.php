@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\InventoryDashboardController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\ItemController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\StockMovementController;
+use TmrEcosystem\Inventory\Presentation\Http\Controllers\OperationsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -36,4 +37,9 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
         Route::post('/operations/delivery', [StockMovementController::class, 'storeDelivery'])->name('operations.store_delivery');
 
         Route::post('/moves/{id}/validate', [StockMovementController::class, 'validateMove'])->name('moves.validate');
+
+        // Operations Routes (แยก Type: incoming, outgoing, picking, packing, internal)
+        Route::get('/ops/{type}', [OperationsController::class, 'index'])->name('ops.index');
+        Route::get('/ops/doc/{id}', [OperationsController::class, 'show'])->name('ops.show');
+        Route::post('/ops/doc/{id}/validate', [OperationsController::class, 'validateTransfer'])->name('ops.validate');
     });

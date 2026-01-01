@@ -2,7 +2,7 @@ import React from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
-import { Truck, CheckCircle, PackagePlus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { Truck, CheckCircle, PackagePlus, ArrowUpRight, ArrowDownLeft, PackageCheck } from 'lucide-react';
 
 // --- Types Definition ---
 
@@ -27,16 +27,36 @@ interface IncomingMove {
     date: string;
 }
 
+interface OutgoingMove {
+    id: number;
+    item_name: string;
+    qty: number;
+    uom: string;
+    destination: string;
+    date: string;
+}
+
 // รวม Props ทั้งหมด
 type DashboardProps = PageProps<{
     items: InventoryItemData[];
-    incomingMoves: IncomingMove[]; // รับค่า Incoming Moves มาจาก Controller
+    incomingMoves: IncomingMove[];
+    outgoingMoves: OutgoingMove[];
 }>;
 
-export default function InventoryDashboard({ auth, items, incomingMoves }: DashboardProps) {
+export default function InventoryDashboard({ auth, items, incomingMoves, outgoingMoves }: DashboardProps) {
 
     // ใช้ useForm สำหรับการยิง Request กดรับของ (Validate)
     const { post, processing } = useForm();
+
+    const handleValidateMove = (id: number, type: 'receive' | 'deliver') => {
+        const message = type === 'receive'
+            ? 'Confirm receipt of goods?'
+            : 'Confirm delivery to customer? Stock will be deducted.';
+
+        if (window.confirm(message)) {
+            post(route('inventory.moves.validate', id));
+        }
+    };
 
     // ฟังก์ชันกดปุ่ม Receive ในกล่องแจ้งเตือน
     const handleReceive = (id: number) => {
@@ -98,48 +118,79 @@ export default function InventoryDashboard({ auth, items, incomingMoves }: Dashb
                     {/* ---------------------------------------------------------
                         SECTION 2: Pending Receipts (งานรอรับของ) - แสดงเฉพาะเมื่อมีข้อมูล
                        --------------------------------------------------------- */}
-                    {incomingMoves && incomingMoves.length > 0 && (
-                        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6 animate-fade-in-up">
-                            <h3 className="text-lg font-bold text-orange-800 dark:text-orange-300 flex items-center mb-4">
-                                <Truck className="w-5 h-5 mr-2" /> Pending Receipts (Incoming)
-                            </h3>
-                            <div className="bg-white dark:bg-gray-800 rounded shadow overflow-hidden border border-orange-100 dark:border-gray-700">
-                                <table className="min-w-full text-sm divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead className="bg-gray-50 dark:bg-gray-700">
-                                        <tr>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Expected Date</th>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Source / Vendor</th>
-                                            <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                            <th className="px-4 py-3 text-right font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
-                                            <th className="px-4 py-3 text-center font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                        {incomingMoves.map(move => (
-                                            <tr key={move.id} className="hover:bg-orange-50/50 dark:hover:bg-gray-700/50 transition">
-                                                <td className="px-4 py-3 whitespace-nowrap text-gray-700 dark:text-gray-300">{move.date}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-gray-500 dark:text-gray-400">{move.source}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900 dark:text-gray-100">{move.item_name}</td>
-                                                <td className="px-4 py-3 whitespace-nowrap text-right font-bold text-orange-600 dark:text-orange-400">
-                                                    {move.qty} <span className="text-xs font-normal text-gray-500">{move.uom}</span>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <button
-                                                        onClick={() => handleReceive(move.id)}
-                                                        disabled={processing}
-                                                        className="inline-flex items-center px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-500"
-                                                    >
-                                                        <CheckCircle className="w-3 h-3 mr-1" />
-                                                        Receive
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* ---------------------------------------------------------
+                            SECTION 2.1: Pending Receipts (Incoming) - สีส้ม
+                           --------------------------------------------------------- */}
+                        {incomingMoves && incomingMoves.length > 0 ? (
+                            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6">
+                                <h3 className="text-lg font-bold text-orange-800 dark:text-orange-300 flex items-center mb-4">
+                                    <Truck className="w-5 h-5 mr-2" /> Pending Receipts
+                                </h3>
+                                {/* ... Table Incoming เดิม ... */}
+                                <div className="bg-white dark:bg-gray-800 rounded shadow overflow-hidden border border-orange-100 dark:border-gray-700">
+                                    <table className="min-w-full text-sm">
+                                        {/* ... Table Header/Body ... */}
+                                        <tbody className="divide-y divide-gray-100">
+                                            {incomingMoves.map(move => (
+                                                <tr key={move.id}>
+                                                    {/* ... colums ... */}
+                                                    <td className="px-4 py-2 text-right">
+                                                        <button onClick={() => handleValidateMove(move.id, 'receive')} className="text-green-600 hover:underline font-bold">Receive</button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        ) : null}
+
+                        {/* ---------------------------------------------------------
+                            SECTION 2.2: Pending Deliveries (Outgoing) - สีฟ้า [NEW!]
+                           --------------------------------------------------------- */}
+                        {outgoingMoves && outgoingMoves.length > 0 ? (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                                <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 flex items-center mb-4">
+                                    <PackageCheck className="w-5 h-5 mr-2" /> Pending Deliveries
+                                </h3>
+                                <div className="bg-white dark:bg-gray-800 rounded shadow overflow-hidden border border-blue-100 dark:border-gray-700">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-gray-50 dark:bg-gray-700">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">Product</th>
+                                                <th className="px-4 py-2 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
+                                                <th className="px-4 py-2 text-center text-xs font-bold text-gray-500 uppercase">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                            {outgoingMoves.map(move => (
+                                                <tr key={move.id} className="hover:bg-blue-50/50 transition">
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-medium text-gray-900">{move.item_name}</div>
+                                                        <div className="text-xs text-gray-500">To: {move.destination}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-blue-600">
+                                                        {move.qty} <span className="text-xs font-normal text-gray-500">{move.uom}</span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => handleValidateMove(move.id, 'deliver')}
+                                                            disabled={processing}
+                                                            className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded shadow-sm transition-colors"
+                                                        >
+                                                            <CheckCircle className="w-3 h-3 mr-1" />
+                                                            Deliver
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
 
                     {/* ---------------------------------------------------------
                         SECTION 3: Stock Overview (ตารางสินค้าคงเหลือ)
