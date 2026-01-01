@@ -34,4 +34,6 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
         // 👇 Delivery Routes
         Route::get('/operations/delivery', [StockMovementController::class, 'createDelivery'])->name('operations.delivery');
         Route::post('/operations/delivery', [StockMovementController::class, 'storeDelivery'])->name('operations.store_delivery');
+
+        Route::post('/moves/{id}/validate', [StockMovementController::class, 'validateMove'])->name('moves.validate');
     });

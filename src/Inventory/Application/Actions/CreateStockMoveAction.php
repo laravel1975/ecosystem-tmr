@@ -22,7 +22,7 @@ class CreateStockMoveAction
             'destination_location_id' => $data->destination_location_id,
             'quantity_demand' => $data->quantity_demand,
             'quantity_done' => $data->quantity_done ?? 0,
-            'state' => 'draft',
+            'state' => $data->state,
             'batch_number' => $data->batch_number, // รองรับ Lot/Batch (ถ้ามีใน DTO)
             'date_expected' => $data->date_expected,
         ]);

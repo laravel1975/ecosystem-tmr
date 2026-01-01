@@ -10,6 +10,7 @@ use TmrEcosystem\Inventory\Application\Actions\ProcessStockMoveAction;
 use TmrEcosystem\Inventory\Application\DTOs\StockMoveData;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryItem;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMove;
 
 class StockMovementController extends Controller
 {
@@ -128,5 +129,21 @@ class StockMovementController extends Controller
         $processAction->execute($move);
 
         return to_route('inventory.dashboard')->with('success', 'Stock delivered successfully.');
+    }
+
+    public function validateMove($id, ProcessStockMoveAction $processAction)
+    {
+        // 1. หา Move ที่ต้องการรับ
+        $move = StockMove::findOrFail($id);
+
+        // 2. ตั้งค่าว่ารับของครบตามจำนวนที่สั่ง (quantity_demand)
+        // (ในระบบจริงอาจจะให้ user แก้ตัวเลขได้ถ้ารับของไม่ครบ)
+        $move->quantity_done = $move->quantity_demand;
+        $move->save();
+
+        // 3. รัน Process เพื่อตัดสต็อกจริง (เปลี่ยน state เป็น done)
+        $processAction->execute($move);
+
+        return back()->with('success', 'Stock received successfully.');
     }
 }
