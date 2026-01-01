@@ -17,6 +17,6 @@ class InventoryServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../Database/Migrations');
 
         // ✅ 2. Load Routes (ถ้ามี)
-        $this->loadRoutesFrom(__DIR__ . '/../../Presentation/Http/inventory.php');
+        $this->loadRoutesFrom(__DIR__ . '/../../Presentation/Http/routes/inventory.php');
     }
 }

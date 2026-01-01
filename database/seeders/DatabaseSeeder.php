@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use TmrEcosystem\Inventory\Infrastructure\Database\Seeders\InventoryLocationSeeder;
+use TmrEcosystem\Inventory\Infrastructure\Database\Seeders\InventoryMasterDataSeeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -16,13 +17,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        // User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
-
-        $this->call(InventoryLocationSeeder::class);
+        // เรียงลำดับสำคัญ: Location -> Master Data (UOM/Cat/Item)
+        $this->call([
+            InventoryLocationSeeder::class,
+            InventoryMasterDataSeeder::class,
+        ]);
     }
 }
