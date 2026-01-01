@@ -1,5 +1,5 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 
 // กำหนด Type ของข้อมูลที่ส่งมาจาก Controller
@@ -13,9 +13,15 @@ interface InventoryItemData {
     on_hand: number;
 }
 
-export default function InventoryDashboard({ auth, items }: PageProps<{ items: InventoryItemData[] }>) {
+export default function InventoryDashboard({ items }: PageProps<{ items: InventoryItemData[] }>) {
     return (
-        <>
+        <AuthenticatedLayout
+            header={
+                <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
+                    Inventory
+                </h2>
+            }
+        >
             <Head title="Inventory" />
 
             <div className="py-12">
@@ -25,9 +31,26 @@ export default function InventoryDashboard({ auth, items }: PageProps<{ items: I
 
                             <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-lg font-medium">Stock Overview</h3>
-                                <button className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-500">
-                                    + New Product
-                                </button>
+                                <div className="flex gap-2">
+                                    <Link
+                                        href={route('inventory.operations.receive')}
+                                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50 inline-flex items-center"
+                                    >
+                                        ⬇️ Receive Items
+                                    </Link>
+                                    <Link
+                                        href={route('inventory.operations.delivery')}
+                                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md text-sm hover:bg-gray-50 inline-flex items-center"
+                                    >
+                                        ⬆️ Deliver
+                                    </Link>
+                                    <Link
+                                        href={route('inventory.items.create')}
+                                        className="px-4 py-2 bg-indigo-600 text-white rounded-md text-sm hover:bg-indigo-500 inline-flex items-center transition ease-in-out duration-150"
+                                    >
+                                        + New
+                                    </Link>
+                                </div>
                             </div>
 
                             {/* ตารางสินค้า */}
@@ -67,6 +90,6 @@ export default function InventoryDashboard({ auth, items }: PageProps<{ items: I
                     </div>
                 </div>
             </div>
-        </>
+        </AuthenticatedLayout>
     );
 }
