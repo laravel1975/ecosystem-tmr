@@ -9,13 +9,13 @@ use TmrEcosystem\Inventory\Application\Actions\CreateStockMoveAction;
 use TmrEcosystem\Inventory\Application\DTOs\StockMoveData;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTransfer;
-use TmrEcosystem\Inventory\Application\Services\DocumentNumberService; // <--- Import Service
+use TmrEcosystem\Inventory\Application\Services\DocumentNumberService;
 
 class ConfirmSalesOrderAction
 {
     public function __construct(
         protected CreateStockMoveAction $createStockMoveAction,
-        protected DocumentNumberService $docService // <--- Inject Service
+        protected DocumentNumberService $docService
     ) {}
 
     public function execute(SalesOrder $order): void
@@ -27,19 +27,26 @@ class ConfirmSalesOrderAction
 
         DB::transaction(function () use ($order) {
 
-            // 2. กำหนดทิศทาง (Internal -> Customer)
-            $sourceLoc = InventoryLocation::where('usage', 'internal')->firstOrFail();
-            $destLoc = InventoryLocation::where('usage', 'customer')->firstOrFail();
+            // 2. กำหนดทิศทางสำหรับ Picking (Stock -> Packing Zone)
 
-            // 3. ✅ สร้าง Header เอกสาร (OUT26-xxxxxx)
+            // ต้นทาง: คลังสินค้าหลัก (เลือก internal ที่ไม่ใช่โซนแพ็คหรือโซนออกของ)
+            $sourceLoc = InventoryLocation::where('usage', 'internal')
+                ->where('name', '!=', 'Packing Zone')
+                ->where('name', '!=', 'Output Zone')
+                ->firstOrFail();
+
+            // ปลายทาง: จุดแพ็คของ (Packing Zone)
+            $packLoc = InventoryLocation::where('name', 'Packing Zone')->firstOrFail();
+
+            // 3. ✅ สร้าง Header เอกสาร Picking (PICK26-xxxxxx)
             $transfer = StockTransfer::create([
                 'uuid' => Str::uuid(),
-                'reference' => $this->docService->generateNextNumber('outgoing'), // Generate เลข OUT
-                'type' => 'outgoing',
+                'reference' => $this->docService->generateNextNumber('picking'), // Generate เลข PICK
+                'type' => 'picking', // ประเภท Picking
                 'source_location_id' => $sourceLoc->id,
-                'destination_location_id' => $destLoc->id,
-                'contact_id' => $order->customer_id, // เก็บ Customer ID
-                'status' => 'ready', // พร้อมส่ง
+                'destination_location_id' => $packLoc->id, // ส่งไป Packing Zone
+                'contact_id' => $order->customer_id,
+                'status' => 'ready', // พร้อมหยิบ
                 'scheduled_date' => $order->date_delivery_expected ?? now(),
             ]);
 
@@ -49,8 +56,8 @@ class ConfirmSalesOrderAction
                 $moveData = new StockMoveData(
                     uuid: null,
                     item_id: $line->item_id,
-                    source_location_id: $sourceLoc->id,
-                    destination_location_id: $destLoc->id,
+                    source_location_id: $sourceLoc->id,     // จาก Stock
+                    destination_location_id: $packLoc->id,  // ไป Packing Zone
                     quantity_demand: $line->quantity,
                     quantity_done: 0,
                     state: 'confirmed',

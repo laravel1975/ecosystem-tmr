@@ -5,7 +5,6 @@ namespace TmrEcosystem\Inventory\Infrastructure\Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
-// *หมายเหตุ: โปรดปรับ Namespace Model ให้ตรงกับที่คุณสร้างจริง
 
 class InventoryLocationSeeder extends Seeder
 {
@@ -15,24 +14,23 @@ class InventoryLocationSeeder extends Seeder
     public function run(): void
     {
         // 1. สร้าง Virtual Locations (สถานที่เสมือน)
-        // ใช้สำหรับ: การปรับยอด (Loss), การผลิต, หรือ Scrapped
         $virtualRoot = $this->createLocation([
             'name' => 'Virtual Locations',
             'code' => 'VIRTUAL',
-            'usage' => 'view', // เป็นแค่ Folder เก็บ
+            'usage' => 'view',
         ]);
 
         $this->createLocation([
             'name' => 'Inventory Adjustment',
             'code' => 'INV-ADJ',
-            'usage' => 'inventory', // ใช้ปรับยอด (Stock +/-)
+            'usage' => 'inventory',
             'parent_id' => $virtualRoot->id,
         ]);
 
         $this->createLocation([
             'name' => 'Scrapped',
             'code' => 'SCRAP',
-            'usage' => 'inventory', // ของเสีย
+            'usage' => 'inventory',
             'is_scrap' => true,
             'parent_id' => $virtualRoot->id,
         ]);
@@ -40,12 +38,11 @@ class InventoryLocationSeeder extends Seeder
         $this->createLocation([
             'name' => 'Production',
             'code' => 'PROD',
-            'usage' => 'production', // ใช้ในการผลิต (Raw Mat -> Production -> Finish Good)
+            'usage' => 'production',
             'parent_id' => $virtualRoot->id,
         ]);
 
         // 2. สร้าง Partner Locations (สถานที่ภายนอก)
-        // ใช้สำหรับ: ซื้อของเข้า (Vendor) และ ขายของออก (Customer)
         $partnerRoot = $this->createLocation([
             'name' => 'Partner Locations',
             'code' => 'PARTNER',
@@ -55,34 +52,33 @@ class InventoryLocationSeeder extends Seeder
         $this->createLocation([
             'name' => 'Vendors',
             'code' => 'VENDORS',
-            'usage' => 'supplier', // แหล่งที่มาของการซื้อ (Purchase)
+            'usage' => 'supplier',
             'parent_id' => $partnerRoot->id,
         ]);
 
         $this->createLocation([
             'name' => 'Customers',
             'code' => 'CUSTOMERS',
-            'usage' => 'customer', // ปลายทางของการขาย (Sales)
+            'usage' => 'customer',
             'parent_id' => $partnerRoot->id,
         ]);
 
         // 3. สร้าง Physical Warehouse (คลังสินค้าจริง)
-        // โครงสร้างมาตรฐาน: Warehouse -> Stock
         $wh = $this->createLocation([
             'name' => 'Main Warehouse',
             'code' => 'WH',
-            'usage' => 'view', // ตัวคลังหลักมักเป็น View เพื่อดูยอดรวมลูกๆ
+            'usage' => 'view',
         ]);
 
         // 3.1 พื้นที่เก็บสินค้าหลัก (General Stock)
         $stock = $this->createLocation([
             'name' => 'Stock',
             'code' => 'WH-STOCK',
-            'usage' => 'internal', // เก็บของจริง
+            'usage' => 'internal',
             'parent_id' => $wh->id,
         ]);
 
-        // 3.2 (Optional) พื้นที่รับของ (Input) และส่งของ (Output) สำหรับกระบวนการ 2-step
+        // 3.2 พื้นที่รับของ (Input)
         $this->createLocation([
             'name' => 'Input/Receiving',
             'code' => 'WH-IN',
@@ -90,14 +86,23 @@ class InventoryLocationSeeder extends Seeder
             'parent_id' => $wh->id,
         ]);
 
+        // 3.3 ✅ เพิ่ม: พื้นที่แพ็คสินค้า (Packing Zone)
         $this->createLocation([
-            'name' => 'Output/Dispatch',
+            'name' => 'Packing Zone', // ชื่อต้องตรงกับ Code ใน Controller
+            'code' => 'WH-PACK',
+            'usage' => 'internal',
+            'parent_id' => $wh->id,
+        ]);
+
+        // 3.4 ✅ เพิ่ม: พื้นที่รอส่งสินค้า (Output Zone)
+        $this->createLocation([
+            'name' => 'Output Zone', // ชื่อต้องตรงกับ Code ใน Controller
             'code' => 'WH-OUT',
             'usage' => 'internal',
             'parent_id' => $wh->id,
         ]);
 
-        // 3.3 ตัวอย่างชั้นวางสินค้า (Shelf/Bin)
+        // 3.5 ตัวอย่างชั้นวางสินค้า (Shelf/Bin)
         $this->createLocation([
             'name' => 'Shelf A',
             'code' => 'WH-STOCK-A',
@@ -125,7 +130,6 @@ class InventoryLocationSeeder extends Seeder
         );
 
         // Update Parent Path Logic (Materialized Path)
-        // เช่น "1/5/8" เพื่อให้ Query ลูกหลานได้เร็วๆ
         if (!empty($data['parent_id'])) {
             $parent = InventoryLocation::find($data['parent_id']);
             if ($parent) {
