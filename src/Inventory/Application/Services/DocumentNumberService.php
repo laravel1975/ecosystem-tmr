@@ -14,8 +14,8 @@ class DocumentNumberService
             'incoming' => 'IN',
             'outgoing' => 'OUT',
             'internal' => 'INT',
-            'picking'  => 'PICK',
-            'packing'  => 'PACK',
+            'picking'  => 'PICK', // ใช้สำหรับใบหยิบของ
+            'packing'  => 'PACK', // ใช้สำหรับใบแพ็คของ
             default    => 'DOC',
         };
 

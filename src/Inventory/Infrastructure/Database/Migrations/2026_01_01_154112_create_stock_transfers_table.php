@@ -24,7 +24,26 @@ return new class extends Migration
             // Contact (Optional): เก็บ ID ของ Supplier หรือ Customer
             $table->unsignedBigInteger('contact_id')->nullable();
 
-            $table->string('status')->default('draft'); // draft, ready, done, cancelled
+            // Status: รองรับ 'waiting' สำหรับเอกสารที่ต้องรอใบอื่น
+            $table->string('status')->default('draft'); // draft, ready, done, cancelled, waiting
+
+            // --- 🔥 ส่วนที่เพิ่มใหม่สำหรับ Chain & Backorder ---
+            // เก็บ ID ของเอกสารก่อนหน้า (เช่น Packing ต้องรู้ว่ารอ Picking ใบไหน)
+            $table->foreignId('previous_transfer_id')
+                  ->nullable()
+                  ->constrained('stock_transfers')
+                  ->nullOnDelete();
+
+            // เก็บ ID ใบต้นทางสุด (เผื่ออยากรู้ว่ามาจาก Picking ใบไหนตั้งแต่ต้น)
+            $table->foreignId('origin_transfer_id')
+                  ->nullable()
+                  ->constrained('stock_transfers')
+                  ->nullOnDelete();
+
+            // ระบุว่าเป็นเอกสาร Backorder (ใบเก็บตก) หรือไม่
+            $table->boolean('is_backorder')->default(false);
+            // ---------------------------------------------------
+
             $table->text('note')->nullable();
             $table->date('scheduled_date')->nullable();
 

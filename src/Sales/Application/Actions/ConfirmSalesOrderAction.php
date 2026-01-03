@@ -26,56 +26,113 @@ class ConfirmSalesOrderAction
         }
 
         DB::transaction(function () use ($order) {
+            // 2. เตรียม Locations ที่ต้องใช้ใน Pipeline (Flow: Stock -> Pack -> Output -> Customer)
 
-            // 2. กำหนดทิศทางสำหรับ Picking (Stock -> Packing Zone)
-
-            // ต้นทาง: คลังสินค้าหลัก (เลือก internal ที่ไม่ใช่โซนแพ็คหรือโซนออกของ)
-            $sourceLoc = InventoryLocation::where('usage', 'internal')
+            // ต้นทาง 1: คลังสินค้าหลัก (Stock)
+            $stockLoc = InventoryLocation::where('usage', 'internal')
                 ->where('name', '!=', 'Packing Zone')
                 ->where('name', '!=', 'Output Zone')
                 ->firstOrFail();
 
-            // ปลายทาง: จุดแพ็คของ (Packing Zone)
+            // จุดพัก 1: โซนแพ็ค (Pack)
             $packLoc = InventoryLocation::where('name', 'Packing Zone')->firstOrFail();
 
-            // 3. ✅ สร้าง Header เอกสาร Picking (PICK26-xxxxxx)
-            $transfer = StockTransfer::create([
-                'uuid' => Str::uuid(),
-                'reference' => $this->docService->generateNextNumber('picking'), // Generate เลข PICK
-                'type' => 'picking', // ประเภท Picking
-                'source_location_id' => $sourceLoc->id,
-                'destination_location_id' => $packLoc->id, // ส่งไป Packing Zone
-                'contact_id' => $order->customer_id,
-                'status' => 'ready', // พร้อมหยิบ
-                'scheduled_date' => $order->date_delivery_expected ?? now(),
-            ]);
+            // จุดพัก 2: โซนรอส่ง (Output)
+            $outLoc = InventoryLocation::where('name', 'Output Zone')->firstOrFail();
 
-            // 4. วนลูปสินค้าสร้าง Lines
-            foreach ($order->lines as $line) {
+            // ปลายทาง: ลูกค้า (Customer)
+            $custLoc = InventoryLocation::where('usage', 'customer')->firstOrFail();
 
-                $moveData = new StockMoveData(
-                    uuid: null,
-                    item_id: $line->item_id,
-                    source_location_id: $sourceLoc->id,     // จาก Stock
-                    destination_location_id: $packLoc->id,  // ไป Packing Zone
-                    quantity_demand: $line->quantity,
-                    quantity_done: 0,
-                    state: 'confirmed',
-                    batch_number: null,
-                    date_expected: $order->date_delivery_expected ?? now()
-                );
+            // ---------------------------------------------------------
+            // Step 1: Picking (Stock -> Pack)
+            // สถานะ: Ready (พร้อมให้พนักงานไปหยิบของทันที)
+            // ---------------------------------------------------------
+            $picking = $this->createTransfer(
+                type: 'picking',
+                status: 'ready',
+                sourceId: $stockLoc->id,
+                destId: $packLoc->id,
+                order: $order,
+                prevId: null // ใบแรก ไม่มีใบก่อนหน้า
+            );
 
-                $move = $this->createStockMoveAction->execute($moveData);
+            // ---------------------------------------------------------
+            // Step 2: Packing (Pack -> Output)
+            // สถานะ: Waiting (ต้องรอ Picking เสร็จก่อน ถึงจะแพ็คได้)
+            // ---------------------------------------------------------
+            $packing = $this->createTransfer(
+                type: 'packing',
+                status: 'waiting',
+                sourceId: $packLoc->id,
+                destId: $outLoc->id,
+                order: $order,
+                prevId: $picking->id // เชื่อมโยง: รอใบ Picking
+            );
 
-                // 5. ✅ ผูก Move เข้ากับ Transfer Header
-                $move->transfer_id = $transfer->id;
-                $move->reference_type = SalesOrder::class;
-                $move->reference_id = $order->id;
-                $move->save();
-            }
+            // ---------------------------------------------------------
+            // Step 3: Delivery (Output -> Customer)
+            // สถานะ: Waiting (ต้องรอ Packing เสร็จก่อน ถึงจะส่งได้)
+            // ---------------------------------------------------------
+            $delivery = $this->createTransfer(
+                type: 'outgoing',
+                status: 'waiting',
+                sourceId: $outLoc->id,
+                destId: $custLoc->id,
+                order: $order,
+                prevId: $packing->id // เชื่อมโยง: รอใบ Packing
+            );
 
-            // 6. อัปเดตสถานะ SO
+            // 3. อัปเดตสถานะ SO เป็น Confirmed
             $order->update(['status' => 'confirmed']);
         });
+    }
+
+    /**
+     * Helper Function: สร้าง Header และ Lines (Moves) ให้จบในตัว
+     */
+    private function createTransfer($type, $status, $sourceId, $destId, $order, $prevId)
+    {
+        // 1. สร้าง Header เอกสาร
+        $transfer = StockTransfer::create([
+            'uuid' => Str::uuid(),
+            'reference' => $this->docService->generateNextNumber($type), // Gen เลขตาม Type (PICK, PACK, OUT)
+            'type' => $type,
+            'source_location_id' => $sourceId,
+            'destination_location_id' => $destId,
+            'contact_id' => $order->customer_id,
+            'status' => $status, // ready หรือ waiting
+            'scheduled_date' => $order->date_delivery_expected ?? now(),
+            'previous_transfer_id' => $prevId, // กุญแจสำคัญในการเชื่อมโยง Chain
+        ]);
+
+        // 2. วนลูปสินค้าสร้าง Lines (Stock Moves)
+        foreach ($order->lines as $line) {
+
+            // ถ้า Header รอ (Waiting) -> Move ก็ต้องรอ (Waiting) ยังไม่จองของ
+            // ถ้า Header พร้อม (Ready) -> Move ยืนยัน (Confirmed) จองของเลย
+            $moveState = ($status === 'ready') ? 'confirmed' : 'waiting';
+
+            $moveData = new StockMoveData(
+                uuid: null,
+                item_id: $line->item_id,
+                source_location_id: $sourceId,
+                destination_location_id: $destId,
+                quantity_demand: $line->quantity,
+                quantity_done: 0,
+                state: $moveState,
+                batch_number: null,
+                date_expected: $order->date_delivery_expected ?? now()
+            );
+
+            $move = $this->createStockMoveAction->execute($moveData);
+
+            // 3. ผูก Move เข้ากับ Transfer และ Reference (SO)
+            $move->transfer_id = $transfer->id;
+            $move->reference_type = SalesOrder::class;
+            $move->reference_id = $order->id;
+            $move->save();
+        }
+
+        return $transfer;
     }
 }
