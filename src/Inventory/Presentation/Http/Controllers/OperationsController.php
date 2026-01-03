@@ -172,7 +172,7 @@ class OperationsController extends Controller
         $backorder = $original->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
         $backorder->uuid = Str::uuid();
 
-        // Gen เลขใหม่: PICK26-001-BO (ถ้ามี BO ซ้อน BO ก็จะยาวขึ้น แต่เอาแบบง่ายก่อน)
+        // Gen เลขใหม่: PICK26-001-BO
         $backorder->reference = $original->reference . '-BO';
 
         // สถานะ: ถ้าใบเดิม Ready -> ใบใหม่ก็ Ready รอทำต่อเลย
@@ -206,63 +206,100 @@ class OperationsController extends Controller
     }
 
     /**
-     * ปลดล็อคใบถัดไป และ Sync ยอดให้ตรงกัน
+     * ปลดล็อคใบถัดไป และ Sync ยอดให้ตรงกัน (แก้ไขใหม่: อัปเดตยอดทั้งสายโซ่)
      */
     protected function unlockNextTransfers(StockTransfer $currentDoc, ?StockTransfer $currentBackorder, DocumentNumberService $docService)
     {
-        // หาใบลูกข่ายที่รอใบนี้อยู่ (เช่น Packing รอ Picking)
+        // 1. 🔥 Sync Quantities (Demand) ให้ตรงกันทั้งสายโซ่ (Main Chain)
+        // (เช่น Picking Done 80 -> Pack Demand 80 -> Delivery Demand 80)
+        $this->syncMainChainDemand($currentDoc);
+
+        // 2. หาใบถัดไปที่รออยู่ (Waiting)
         $nextDocs = $currentDoc->nextTransfers()->where('status', 'waiting')->get();
 
         foreach ($nextDocs as $nextDoc) {
-
-            // 1. Sync Quantities: อัปเดต Demand ของใบถัดไป ให้เท่ากับยอดที่ส่งมาจากใบนี้
-            // (เช่น Pick มา 80 -> Pack ก็ต้อง Pack 80 ไม่ใช่ 100)
-            foreach ($currentDoc->moves as $doneMove) {
-                $nextMove = StockMove::where('transfer_id', $nextDoc->id)
-                    ->where('item_id', $doneMove->item_id)
-                    ->first();
-
-                if ($nextMove) {
-                    $nextMove->quantity_demand = $doneMove->quantity_done; // ปรับยอด
-                    $nextMove->save();
-                }
-            }
-
-            // 2. Create Next Backorder (ถ้าใบปัจจุบันมี Backorder -> ใบถัดไปก็ต้องมี Backorder มารองรับ)
+            // 3. Create Next Backorder & Chain (ถ้ามี Backorder ส่งมา)
             if ($currentBackorder) {
-                // Clone ใบถัดไปออกมาเป็น Backorder
-                $nextBackorder = $nextDoc->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
-                $nextBackorder->uuid = Str::uuid();
-                $nextBackorder->reference = $nextDoc->reference . '-BO';
-                $nextBackorder->status = 'waiting'; // รอใบ Backorder ก่อนหน้าเสมอ
-                $nextBackorder->is_backorder = true;
-                $nextBackorder->previous_transfer_id = $currentBackorder->id; // Link หา Backorder แม่
-                $nextBackorder->save();
-
-                // สร้าง Moves ให้ Next Backorder (ยอดเท่ากับที่ค้างไว้ใน Current Backorder)
-                foreach ($currentBackorder->moves as $boMove) {
-                    $nextMoveTemplate = StockMove::where('transfer_id', $nextDoc->id)
-                        ->where('item_id', $boMove->item_id)
-                        ->first();
-
-                    if ($nextMoveTemplate) {
-                        $newNextMove = $nextMoveTemplate->replicate(['uuid', 'transfer_id', 'state', 'created_at', 'updated_at']);
-                        $newNextMove->uuid = Str::uuid();
-                        $newNextMove->transfer_id = $nextBackorder->id;
-                        $newNextMove->quantity_demand = $boMove->quantity_demand; // ยอดที่ค้างส่ง
-                        $newNextMove->quantity_done = 0;
-                        $newNextMove->state = 'waiting';
-                        $newNextMove->save();
-                    }
-                }
+                $this->propagateBackorderChain($nextDoc, $currentBackorder);
             }
 
-            // 3. Unlock: เปลี่ยนสถานะเป็น Ready (เฉพาะใบหลัก)
+            // 4. Unlock: เปลี่ยนสถานะเป็น Ready
             $nextDoc->status = 'ready';
             $nextDoc->save();
 
-            // อัปเดตสถานะ Moves ภายในให้เป็น confirmed (จองของ)
+            // อัปเดตสถานะ Moves ภายในให้เป็น confirmed (พร้อมทำ)
             $nextDoc->moves()->update(['state' => 'confirmed']);
+        }
+    }
+
+    /**
+     * ✅ ฟังก์ชันใหม่: อัปเดตยอด Demand ของเอกสารใบหลักทั้งสายโซ่
+     */
+    protected function syncMainChainDemand(StockTransfer $sourceDoc)
+    {
+        $nextDocs = $sourceDoc->nextTransfers; // หาใบลูกข่ายทั้งหมด
+
+        foreach ($nextDocs as $nextDoc) {
+            foreach ($sourceDoc->moves as $sourceMove) {
+                $nextMove = StockMove::where('transfer_id', $nextDoc->id)
+                    ->where('item_id', $sourceMove->item_id)
+                    ->first();
+
+                if ($nextMove) {
+                     // Logic:
+                     // ถ้าเป็นใบแม่ที่เพิ่งจบ (Done) -> ใช้ยอดที่ทำเสร็จจริง (Done)
+                     // ถ้าเป็นใบระหว่างทาง (ที่เพิ่งถูกอัปเดต) -> ใช้ยอด Demand ของมันส่งต่อ
+                     $qtyToPropagate = ($sourceDoc->status === 'done') ? $sourceMove->quantity_done : $sourceMove->quantity_demand;
+
+                     // อัปเดต Demand ของใบถัดไป
+                     if ($nextMove->quantity_demand != $qtyToPropagate) {
+                         $nextMove->quantity_demand = $qtyToPropagate;
+                         $nextMove->save();
+                     }
+                }
+            }
+
+            // 🔄 Recursive: ส่งต่อไปอัปเดตใบลูกของลูกด้วย (เช่น Pack -> Delivery)
+            $this->syncMainChainDemand($nextDoc);
+        }
+    }
+
+    /**
+     * ✅ ฟังก์ชันใหม่: สร้าง Backorder แบบลูกโซ่ (Recursive)
+     */
+    protected function propagateBackorderChain(StockTransfer $originalDoc, StockTransfer $parentBackorder)
+    {
+        // 1. Clone Header
+        $newBackorder = $originalDoc->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
+        $newBackorder->uuid = Str::uuid();
+        $newBackorder->reference = $originalDoc->reference . '-BO';
+        $newBackorder->status = 'waiting'; // สถานะรอเสมอ
+        $newBackorder->is_backorder = true;
+        $newBackorder->previous_transfer_id = $parentBackorder->id;
+        $newBackorder->save();
+
+        // 2. Clone Moves
+        foreach ($parentBackorder->moves as $parentMove) {
+             // หา Move คู่กันในใบ Original
+             $templateMove = StockMove::where('transfer_id', $originalDoc->id)
+                ->where('item_id', $parentMove->item_id)
+                ->first();
+
+             if ($templateMove) {
+                 $newMove = $templateMove->replicate(['uuid', 'transfer_id', 'state', 'created_at', 'updated_at']);
+                 $newMove->uuid = Str::uuid();
+                 $newMove->transfer_id = $newBackorder->id;
+                 $newMove->quantity_demand = $parentMove->quantity_demand; // ยอดที่ค้างส่ง
+                 $newMove->quantity_done = 0;
+                 $newMove->state = 'waiting';
+                 $newMove->save();
+             }
+        }
+
+        // 3. 🔄 RECURSIVE: หาใบถัดไปของ Original แล้วทำซ้ำ
+        $downstreamDocs = $originalDoc->nextTransfers;
+        foreach ($downstreamDocs as $downstreamDoc) {
+            $this->propagateBackorderChain($downstreamDoc, $newBackorder);
         }
     }
 }
