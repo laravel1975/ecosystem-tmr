@@ -11,6 +11,7 @@ use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTrans
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMove;
 use TmrEcosystem\Inventory\Application\Actions\ProcessStockMoveAction;
 use TmrEcosystem\Inventory\Application\Services\DocumentNumberService;
+use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrder; // ✅ เพิ่ม Import SalesOrder
 
 class OperationsController extends Controller
 {
@@ -32,8 +33,14 @@ class OperationsController extends Controller
 
     public function show($id)
     {
-        $transfer = StockTransfer::with(['moves.item.uom', 'sourceLocation', 'destinationLocation'])
-            ->findOrFail($id);
+        // ✅ เพิ่ม 'previousTransfer' และ 'nextTransfers' เพื่อใช้ใน Frontend (Smart Links)
+        $transfer = StockTransfer::with([
+            'moves.item.uom',
+            'sourceLocation',
+            'destinationLocation',
+            'previousTransfer',
+            'nextTransfers'
+        ])->findOrFail($id);
 
         if ($transfer->type === 'incoming') {
             $transfer->load('vendor');
@@ -141,9 +148,40 @@ class OperationsController extends Controller
 
             // 4. จบงานใบนี้
             $transfer->update(['status' => 'done']);
+
+            // 5. ✅ Sync Sales Order Status (อัปเดตสถานะใบสั่งขาย)
+            $this->syncSalesOrderStatus($transfer);
         });
 
         return back()->with('success', 'Validated successfully.');
+    }
+
+    /**
+     * ✅ ฟังก์ชันใหม่: อัปเดตสถานะ Sales Order ตามความคืบหน้าหน้างาน
+     */
+    protected function syncSalesOrderStatus(StockTransfer $transfer)
+    {
+        // ต้องมีเลข Source Document ถึงจะรู้ว่ามาจาก SO ใบไหน
+        if (!$transfer->source_document) return;
+
+        // ค้นหา SO
+        $so = SalesOrder::where('code', $transfer->source_document)->first();
+        if (!$so) return;
+
+        // Logic การเปลี่ยนสถานะ SO
+        // Picking Done -> ไป Packing
+        // Packing Done -> ไป Ready to Ship
+        // Outgoing Done -> ไป Delivered
+        $newStatus = match ($transfer->type) {
+            'picking' => 'packing',
+            'packing' => 'ready_to_ship',
+            'outgoing' => 'delivered',
+            default => null,
+        };
+
+        if ($newStatus) {
+            $so->update(['status' => $newStatus]);
+        }
     }
 
     /**

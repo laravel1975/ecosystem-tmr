@@ -103,6 +103,7 @@ class ConfirmSalesOrderAction
             'status' => $status, // ready หรือ waiting
             'scheduled_date' => $order->date_delivery_expected ?? now(),
             'previous_transfer_id' => $prevId, // กุญแจสำคัญในการเชื่อมโยง Chain
+            'source_document' => $order->code, // ✅ เพิ่มตรงนี้: บันทึกเลขที่ SO ลงในเอกสาร
         ]);
 
         // 2. วนลูปสินค้าสร้าง Lines (Stock Moves)

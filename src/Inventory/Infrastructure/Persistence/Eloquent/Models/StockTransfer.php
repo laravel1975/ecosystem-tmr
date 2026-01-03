@@ -10,6 +10,7 @@ use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\Customer;
 
 class StockTransfer extends Model
 {
+    // ใช้ guarded = [] เพื่ออนุญาตให้เติมข้อมูลได้ทุก field (รวมถึง source_document)
     protected $guarded = [];
 
     // เพิ่ม append attribute เพื่อให้ Inertia ส่ง contact ไปที่ Frontend อัตโนมัติเมื่อมีการเรียก model
