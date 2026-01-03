@@ -15,6 +15,8 @@ use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrder;
 
 class OperationsController extends Controller
 {
+    // ... index, show, edit, update (คงเดิม) ...
+
     public function index($type)
     {
         $contactRelation = ($type === 'incoming') ? 'vendor' : 'customer';
@@ -107,7 +109,7 @@ class OperationsController extends Controller
     }
 
     // --------------------------------------------------------------------------
-    // 🚀 MASTER LOGIC: Validate & Chain & Backorder (Fixed for Partial Picking)
+    // 🚀 MASTER LOGIC: Validate & Chain & Backorder
     // --------------------------------------------------------------------------
     public function validateTransfer($id, ProcessStockMoveAction $processAction, DocumentNumberService $docService)
     {
@@ -123,11 +125,10 @@ class OperationsController extends Controller
             // 1. Process Moves (ตัดสต็อก)
             foreach ($transfer->moves as $move) {
                 if ($move->state !== 'done') {
+                    // ลบ Logic Auto-fill เพื่อรองรับ Partial Picking (ตามที่ต้องการ)
+                    // if ($move->quantity_done == 0 && !$hasBackorder) { ... }
 
-                    // ⚠️ FIX: ลบ Logic Auto-fill ออก เพื่อรองรับกรณี User ตั้งใจกรอก 0 (Partial Picking / No Pick)
-                    // if ($move->quantity_done == 0 && !$hasBackorder) { ... }  <-- ลบส่วนนี้ทิ้ง
-
-                    // เช็ค Backorder: ถ้า Done น้อยกว่า Demand ถือว่าเป็น Backorder ทันที
+                    // เช็คว่าต้องทำ Backorder หรือไม่
                     if ($move->quantity_done < $move->quantity_demand) {
                         $hasBackorder = true;
                     }
@@ -157,51 +158,42 @@ class OperationsController extends Controller
     }
 
     /**
-     * Helper: สร้างชื่อ Backorder ไม่ให้ซ้ำ
+     * Helper: สร้างชื่อ Backorder แบบสะอาด (Clean Reference)
+     * แก้ปัญหา BO-BO-BO โดยการหา Root Name แล้วรันเลขต่อท้ายแทน
      */
     protected function generateBackorderReference($baseReference)
     {
-        $reference = $baseReference . '-BO';
-        $count = 1;
+        // 1. ตัดส่วนที่เป็น -BO หรือ -BO-xxx ออกจากชื่อ เพื่อหา "ชื่อต้นฉบับ"
+        // เช่น PACK26-001-BO -> PACK26-001
+        // เช่น PACK26-001-BO-2 -> PACK26-001
+        $rootReference = preg_replace('/-BO(-\d+)?$/', '', $baseReference);
 
-        // วนลูปเช็คจนกว่าจะได้ชื่อที่ไม่ซ้ำ
-        while (StockTransfer::where('reference', $reference)->exists()) {
+        // 2. เริ่มต้นเช็คจาก -BO ธรรมดา
+        $candidate = $rootReference . '-BO';
+
+        // 3. ถ้ามีชื่อนี้แล้ว ให้เริ่มนับ -BO-2, -BO-3 ไปเรื่อยๆ
+        $count = 1;
+        while (StockTransfer::where('reference', $candidate)->exists()) {
             $count++;
-            $reference = $baseReference . '-BO-' . $count;
+            $candidate = $rootReference . '-BO-' . $count;
         }
 
-        return $reference;
+        return $candidate;
     }
 
-    /**
-     * สร้างเอกสาร Backorder สำหรับยอดที่เหลือ
-     */
     protected function createBackorder(StockTransfer $original, DocumentNumberService $docService)
     {
-        // ✅ FIX: เช็คว่าใบนี้เคยทำ Backorder ไปแล้วหรือยัง (ป้องกัน Duplicate)
-        // เพื่อป้องกันการสร้างซ้ำในกรณีที่มีการเรียกฟังก์ชันนี้หลายครั้งใน transaction เดียวกัน หรือ logic อื่นๆ
-        $existingBackorder = StockTransfer::where('previous_transfer_id', $original->previous_transfer_id) // ใช้ previous_transfer_id เพื่อเช็คความสัมพันธ์ หรือถ้ามี origin_transfer_id ก็ใช้ได้
-            ->where('reference', 'like', $original->reference . '-BO%') // เช็ค reference แบบคร่าวๆ
-            ->where('is_backorder', true)
-            // เพิ่มเงื่อนไขอื่นๆ ตามความเหมาะสม เช่น created_at เพื่อดูว่าเป็นรายการล่าสุด
-            ->first();
-
-        // หมายเหตุ: การเช็ค existingBackorder อาจจะซับซ้อนขึ้นอยู่กับ logic ของระบบว่ายอมให้มี BO หลายใบจากใบแม่เดียวหรือไม่
-        // ในที่นี้เราเน้นแก้ปัญหา Duplicate Entry โดยการ Gen Reference ใหม่
-
+        // ใช้ Helper สร้าง Reference ใหม่เพื่อป้องกัน Duplicate Entry
         $newReference = $this->generateBackorderReference($original->reference);
 
         $backorder = $original->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
         $backorder->uuid = Str::uuid();
-        $backorder->reference = $newReference; // ✅ ใช้ Reference ที่ไม่ซ้ำ
+        $backorder->reference = $newReference; // ✅ ใช้ชื่อที่ไม่ซ้ำ
 
-        // FIX STATUS:
-        // ถ้าเป็น Picking (ต้นน้ำ ไม่มี Parent) -> Backorder ควร Ready ทันที เพื่อให้หยิบต่อ
-        // ถ้าเป็น Packing/Outgoing (ปลายน้ำ) -> Backorder ควร Waiting เพื่อรอของจาก Picking-BO
+        // Status Logic: Picking -> Ready, Others -> Waiting
         if ($original->type === 'picking') {
             $backorder->status = 'ready';
         } else {
-            // ถ้าไม่ใช่ picking ให้เช็คว่ามี parent ไหม ถ้ามีก็ waiting ไว้ก่อน
             $backorder->status = $original->previous_transfer_id ? 'waiting' : 'ready';
         }
 
@@ -213,7 +205,7 @@ class OperationsController extends Controller
             $remaining = $move->quantity_demand - $move->quantity_done;
 
             if ($remaining > 0) {
-                // ปรับยอดใบเก่าให้เท่ากับที่ทำจริง
+                // ปรับยอดใบเก่า
                 $move->quantity_demand = $move->quantity_done;
                 $move->save();
 
@@ -223,8 +215,6 @@ class OperationsController extends Controller
                 $newMove->transfer_id = $backorder->id;
                 $newMove->quantity_demand = $remaining;
                 $newMove->quantity_done = 0;
-
-                // สถานะ Move ตาม Header
                 $newMove->state = ($backorder->status === 'ready') ? 'confirmed' : 'waiting';
                 $newMove->save();
             }
@@ -267,17 +257,14 @@ class OperationsController extends Controller
         }
     }
 
-    /**
-     * สร้าง Backorder แบบลูกโซ่ (Recursive)
-     */
     protected function propagateBackorderChain(StockTransfer $originalDoc, StockTransfer $parentBackorder)
     {
-        // ✅ FIX: Gen Reference ใหม่ให้ไม่ซ้ำ
+        // ใช้ Helper สร้าง Reference ใหม่เช่นกัน
         $newReference = $this->generateBackorderReference($originalDoc->reference);
 
         $newBackorder = $originalDoc->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
         $newBackorder->uuid = Str::uuid();
-        $newBackorder->reference = $newReference; // ✅ ใช้ Reference ที่ไม่ซ้ำ
+        $newBackorder->reference = $newReference; // ✅ ใช้ชื่อที่ไม่ซ้ำ
         $newBackorder->status = 'waiting';
         $newBackorder->is_backorder = true;
         $newBackorder->previous_transfer_id = $parentBackorder->id;
