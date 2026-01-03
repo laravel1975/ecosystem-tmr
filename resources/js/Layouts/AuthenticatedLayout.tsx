@@ -27,21 +27,69 @@ export default function Authenticated({
                             </div>
 
                             <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                                {/* Sales Menu */}
                                 <NavLink
                                     href={route('sales.orders.index')}
-                                    active={route().current('sales.orders.index')}
+                                    active={route().current('sales.orders.*')}
                                 >
                                     Sales
                                 </NavLink>
-                                <NavLink
-                                    href={route('inventory.dashboard')}
-                                    active={route().current('inventory.dashboard')}
-                                >
-                                    Inventory
-                                </NavLink>
+
+                                {/* Inventory Dropdown Menu */}
+                                <div className="hidden sm:flex sm:items-center">
+                                    <Dropdown>
+                                        <Dropdown.Trigger>
+                                            <span className="inline-flex rounded-md">
+                                                <button
+                                                    type="button"
+                                                    className={`inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none ${
+                                                        route().current('inventory.*')
+                                                            ? 'border-indigo-400 text-gray-900 focus:border-indigo-700 dark:border-indigo-600 dark:text-gray-100'
+                                                            : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 focus:border-gray-300 focus:text-gray-700 dark:text-gray-400 dark:hover:border-gray-700 dark:hover:text-gray-300'
+                                                    }`}
+                                                >
+                                                    Inventory
+                                                    <svg
+                                                        className="-me-0.5 ms-2 h-4 w-4"
+                                                        xmlns="http://www.w3.org/2000/svg"
+                                                        viewBox="0 0 20 20"
+                                                        fill="currentColor"
+                                                    >
+                                                        <path
+                                                            fillRule="evenodd"
+                                                            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                                                            clipRule="evenodd"
+                                                        />
+                                                    </svg>
+                                                </button>
+                                            </span>
+                                        </Dropdown.Trigger>
+
+                                        <Dropdown.Content>
+                                            <Dropdown.Link href={route('inventory.dashboard')}>
+                                                Overview
+                                            </Dropdown.Link>
+                                            <div className="border-t border-gray-100 dark:border-gray-700"></div>
+                                            <Dropdown.Link href={route('inventory.ops.index', 'incoming')}>
+                                                Receipts (Incoming)
+                                            </Dropdown.Link>
+                                            <Dropdown.Link href={route('inventory.ops.index', 'picking')}>
+                                                Picking Operations
+                                            </Dropdown.Link>
+                                            <Dropdown.Link href={route('inventory.ops.index', 'packing')}>
+                                                Packing Operations
+                                            </Dropdown.Link>
+                                            <Dropdown.Link href={route('inventory.ops.index', 'outgoing')}>
+                                                Delivery Orders
+                                            </Dropdown.Link>
+                                        </Dropdown.Content>
+                                    </Dropdown>
+                                </div>
+
+                                {/* Purchase Menu */}
                                 <NavLink
                                     href={route('purchase.orders.index')}
-                                    active={route().current('purchase.orders.index')}
+                                    active={route().current('purchase.orders.*')}
                                 >
                                     Purchase
                                 </NavLink>
@@ -76,9 +124,7 @@ export default function Authenticated({
                                     </Dropdown.Trigger>
 
                                     <Dropdown.Content>
-                                        <Dropdown.Link
-                                            href={route('profile.edit')}
-                                        >
+                                        <Dropdown.Link href={route('profile.edit')}>
                                             Profile
                                         </Dropdown.Link>
                                         <Dropdown.Link
@@ -148,6 +194,54 @@ export default function Authenticated({
                             active={route().current('dashboard')}
                         >
                             Dashboard
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            href={route('sales.orders.index')}
+                            active={route().current('sales.orders.*')}
+                        >
+                            Sales
+                        </ResponsiveNavLink>
+
+                        {/* Mobile Inventory Menu */}
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-2 pb-2">
+                            <div className="px-4 text-xs font-semibold text-gray-500 uppercase">Inventory</div>
+                            <ResponsiveNavLink
+                                href={route('inventory.dashboard')}
+                                active={route().current('inventory.dashboard')}
+                            >
+                                &nbsp;&nbsp;Overview
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                href={route('inventory.ops.index', 'picking')}
+                                active={route().current('inventory.ops.index', 'picking')}
+                            >
+                                &nbsp;&nbsp;Picking Operations
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                href={route('inventory.ops.index', 'packing')}
+                                active={route().current('inventory.ops.index', 'packing')}
+                            >
+                                &nbsp;&nbsp;Packing Operations
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                href={route('inventory.ops.index', 'outgoing')}
+                                active={route().current('inventory.ops.index', 'outgoing')}
+                            >
+                                &nbsp;&nbsp;Delivery Operations
+                            </ResponsiveNavLink>
+                             <ResponsiveNavLink
+                                href={route('inventory.ops.index', 'incoming')}
+                                active={route().current('inventory.ops.index', 'incoming')}
+                            >
+                                &nbsp;&nbsp;Receipts
+                            </ResponsiveNavLink>
+                        </div>
+
+                        <ResponsiveNavLink
+                            href={route('purchase.orders.index')}
+                            active={route().current('purchase.orders.*')}
+                        >
+                            Purchase
                         </ResponsiveNavLink>
                     </div>
 
