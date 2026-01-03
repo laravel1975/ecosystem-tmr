@@ -25,7 +25,16 @@ export default function OperationsShow({ transfer }: { transfer: any }) {
                         <Link href={route('inventory.ops.index', transfer.type)} className="flex items-center text-gray-500 hover:text-gray-700">
                             <ArrowLeft className="w-4 h-4 mr-1" /> Back to List
                         </Link>
-                        <div>
+                        <div className="flex gap-2">
+                            {/* ปุ่ม Edit */}
+                            {transfer.status !== 'done' && (
+                                <Link href={route('inventory.ops.edit', transfer.id)}>
+                                    <Button variant="outline" className="border-gray-300">
+                                        Edit
+                                    </Button>
+                                </Link>
+                            )}
+                            
                             {transfer.status !== 'done' ? (
                                 <Button onClick={handleValidate} disabled={processing} className="bg-green-600 hover:bg-green-700 text-white">
                                     <CheckCircle className="w-4 h-4 mr-2" /> Validate
@@ -41,19 +50,19 @@ export default function OperationsShow({ transfer }: { transfer: any }) {
                     {/* Header Info */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                         <Card className="md:col-span-2 border-t-4 border-t-indigo-500">
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-500 flex items-center gap-2"><User className="w-4 h-4"/> Contact / Partner</CardTitle></CardHeader>
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-500 flex items-center gap-2"><User className="w-4 h-4" /> Contact / Partner</CardTitle></CardHeader>
                             <CardContent>
                                 <div className="text-lg font-bold text-gray-800">{transfer.contact ? transfer.contact.name : 'Unknown'}</div>
                                 <div className="text-sm text-gray-500">{transfer.contact?.address}</div>
                             </CardContent>
                         </Card>
                         <Card>
-                             <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-500 flex items-center gap-2"><Calendar className="w-4 h-4"/> Info</CardTitle></CardHeader>
-                             <CardContent className="space-y-2">
+                            <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-500 flex items-center gap-2"><Calendar className="w-4 h-4" /> Info</CardTitle></CardHeader>
+                            <CardContent className="space-y-2">
                                 <div className="flex justify-between text-sm"><span>Date:</span> <span className="font-medium">{transfer.scheduled_date}</span></div>
                                 <div className="flex justify-between text-sm"><span>Type:</span> <span className="font-medium uppercase">{transfer.type}</span></div>
                                 <div className="flex justify-between text-sm"><span>Status:</span> <span className="font-bold text-blue-600 uppercase">{transfer.status}</span></div>
-                             </CardContent>
+                            </CardContent>
                         </Card>
                     </div>
 
@@ -63,14 +72,14 @@ export default function OperationsShow({ transfer }: { transfer: any }) {
                             <div className="flex flex-col">
                                 <span className="text-xs text-gray-400 uppercase font-bold mb-1">From Source</span>
                                 <div className="flex items-center gap-2 font-semibold text-gray-700">
-                                    <MapPin className="w-4 h-4 text-red-500"/> {transfer.source_location?.name}
+                                    <MapPin className="w-4 h-4 text-red-500" /> {transfer.source_location?.name}
                                 </div>
                             </div>
                             <div className="flex-1 border-b border-dashed border-gray-300 mx-8 relative top-1"></div>
                             <div className="flex flex-col text-right">
                                 <span className="text-xs text-gray-400 uppercase font-bold mb-1">To Destination</span>
                                 <div className="flex items-center gap-2 font-semibold text-gray-700 justify-end">
-                                    {transfer.destination_location?.name} <MapPin className="w-4 h-4 text-green-500"/>
+                                    {transfer.destination_location?.name} <MapPin className="w-4 h-4 text-green-500" />
                                 </div>
                             </div>
                         </CardContent>
