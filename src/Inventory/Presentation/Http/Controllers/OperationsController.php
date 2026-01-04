@@ -16,8 +16,7 @@ use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrder;
 
 class OperationsController extends Controller
 {
-    // ... index, show, edit, update (คงเดิม) ...
-
+    // ... index ... (คงเดิม)
     public function index($type)
     {
         $contactRelation = ($type === 'incoming') ? 'vendor' : 'customer';
@@ -41,7 +40,9 @@ class OperationsController extends Controller
             'sourceLocation',
             'destinationLocation',
             'previousTransfer',
-            'nextTransfers'
+            'nextTransfers',
+            'vendor',
+            'customer'
         ])->findOrFail($id);
 
         if ($transfer->type === 'incoming') {
@@ -50,11 +51,52 @@ class OperationsController extends Controller
             $transfer->load('customer');
         }
 
+        // ✅ Inject On Hand Quantity: ฝังยอดคงเหลือปัจจุบันไปกับทุก Move เพื่อให้ Frontend ใช้เช็ค
+        foreach ($transfer->moves as $move) {
+            $quant = StockQuant::where('location_id', $transfer->source_location_id)
+                ->where('item_id', $move->item_id)
+                ->first();
+            // เก็บค่า on_hand ไว้ใน object move (Dynamic Property)
+            $move->on_hand = $quant ? $quant->quantity : 0;
+        }
+
+        // หาเอกสาร Backorder ที่เกิดจากใบนี้ (ถ้ามี)
+        $backorder = StockTransfer::where('origin_transfer_id', $id)->first();
+
         return Inertia::render('Inventory/Operations/Show', [
-            'transfer' => $transfer
+            'transfer' => $transfer,
+            'backorder' => $backorder
         ]);
     }
 
+    // ✅ NEW: ฟังก์ชันสำหรับอัปเดตยอด Done ทีละบรรทัด (Inline Update)
+    public function updateMove(Request $request)
+    {
+        $request->validate([
+            'move_id' => 'required|exists:stock_moves,id',
+            'quantity_done' => 'required|numeric|min:0'
+        ]);
+
+        $move = StockMove::findOrFail($request->move_id);
+        $transfer = StockTransfer::find($move->transfer_id);
+
+        // 🛡️ Security Check: ห้ามใส่เกินสต็อกที่มีจริง (Server-side validation)
+        $quant = StockQuant::where('location_id', $transfer->source_location_id)
+            ->where('item_id', $move->item_id)
+            ->first();
+        $onHand = $quant ? $quant->quantity : 0;
+
+        if ($request->quantity_done > $onHand) {
+            return back()->with('error', "Cannot pick more than available stock ({$onHand}).");
+        }
+
+        // Update
+        $move->update(['quantity_done' => $request->quantity_done]);
+
+        return back()->with('success', 'Quantity updated.');
+    }
+
+    // ... edit, update (Header) ... (คงเดิม)
     public function edit($id)
     {
         $transfer = StockTransfer::with(['moves.item.uom', 'sourceLocation', 'destinationLocation'])
@@ -126,9 +168,6 @@ class OperationsController extends Controller
             // 1. Process Moves (ตัดสต็อก)
             foreach ($transfer->moves as $move) {
                 if ($move->state !== 'done') {
-                    // ลบ Logic Auto-fill เพื่อรองรับ Partial Picking (ตามที่ต้องการ)
-                    // if ($move->quantity_done == 0 && !$hasBackorder) { ... }
-
                     // เช็คว่าต้องทำ Backorder หรือไม่
                     if ($move->quantity_done < $move->quantity_demand) {
                         $hasBackorder = true;
@@ -158,27 +197,15 @@ class OperationsController extends Controller
         return back()->with('success', 'Validated successfully.');
     }
 
-    /**
-     * Helper: สร้างชื่อ Backorder แบบสะอาด (Clean Reference)
-     * แก้ปัญหา BO-BO-BO โดยการหา Root Name แล้วรันเลขต่อท้ายแทน
-     */
     protected function generateBackorderReference($baseReference)
     {
-        // 1. ตัดส่วนที่เป็น -BO หรือ -BO-xxx ออกจากชื่อ เพื่อหา "ชื่อต้นฉบับ"
-        // เช่น PACK26-001-BO -> PACK26-001
-        // เช่น PACK26-001-BO-2 -> PACK26-001
         $rootReference = preg_replace('/-BO(-\d+)?$/', '', $baseReference);
-
-        // 2. เริ่มต้นเช็คจาก -BO ธรรมดา
         $candidate = $rootReference . '-BO';
-
-        // 3. ถ้ามีชื่อนี้แล้ว ให้เริ่มนับ -BO-2, -BO-3 ไปเรื่อยๆ
         $count = 1;
         while (StockTransfer::where('reference', $candidate)->exists()) {
             $count++;
             $candidate = $rootReference . '-BO-' . $count;
         }
-
         return $candidate;
     }
 
@@ -190,50 +217,58 @@ class OperationsController extends Controller
             return back()->with('error', 'Operation is not in waiting state.');
         }
 
-        DB::transaction(function () use ($transfer) {
-            $allAvailable = true;
+        // ตัวแปรสำหรับเช็คสถานะภาพรวม
+        $hasAnyStock = false;    // มีของบ้างไหม (แม้นิดเดียว)
+        $isFullAvailability = true; // ของครบทุกอย่างไหม
 
+        DB::transaction(function () use ($transfer, &$hasAnyStock, &$isFullAvailability) {
             foreach ($transfer->moves as $move) {
-                // 1. หา StockQuant ของสินค้านี้ ใน Location ต้นทาง
+                // 1. เช็คของใน Stock (Location ต้นทาง)
                 $quant = StockQuant::where('location_id', $transfer->source_location_id)
                     ->where('item_id', $move->item_id)
                     ->first();
 
                 $onHand = $quant ? $quant->quantity : 0;
 
-                // 2. เช็คว่าพอไหม (Demand vs OnHand)
-                // (ในระบบจริงอาจต้องหักยอดที่ถูกจอง (Reserved) ไปแล้วด้วย แต่นี่เอาแบบ Simple ก่อน)
+                // 2. ประเมินสถานะ
+                if ($onHand > 0) {
+                    $hasAnyStock = true; // เจอของแล้ว! ปล่อยผ่านได้
+                }
+
                 if ($onHand < $move->quantity_demand) {
-                    $allAvailable = false;
-                    // อาจจะอัปเดตสถานะ Move เป็น 'waiting' แยกรายตัวก็ได้
+                    $isFullAvailability = false; // เจอรายการที่ของขาด
                 }
             }
 
-            // 3. ถ้าของครบทุกรายการ -> เปลี่ยนสถานะเป็น Ready
-            if ($allAvailable) {
+            // 3. ถ้ามีของบ้าง (แม้จะไม่ครบ) -> ให้สถานะเป็น Ready เพื่อให้เข้าไปหยิบได้
+            if ($hasAnyStock) {
                 $transfer->update(['status' => 'ready']);
-                // อัปเดต moves ให้เป็น confirmed/assigned
                 $transfer->moves()->update(['state' => 'confirmed']);
             }
         });
 
-        if ($transfer->fresh()->status === 'ready') {
-            return back()->with('success', 'Stock is available. Reserved successfully.');
+        // 4. แจ้งเตือนผู้ใช้ให้ชัดเจน
+        $transfer->refresh();
+
+        if ($transfer->status === 'ready') {
+            if ($isFullAvailability) {
+                return back()->with('success', 'All stock is available. Ready to process.');
+            } else {
+                return back()->with('warning', 'Partial stock available. You can process available items, the rest will be backordered.');
+            }
         } else {
-            return back()->with('error', 'Not enough stock available.');
+            return back()->with('error', 'No stock available for any items.');
         }
     }
 
     protected function createBackorder(StockTransfer $original, DocumentNumberService $docService)
     {
-        // ใช้ Helper สร้าง Reference ใหม่เพื่อป้องกัน Duplicate Entry
         $newReference = $this->generateBackorderReference($original->reference);
 
         $backorder = $original->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
         $backorder->uuid = Str::uuid();
-        $backorder->reference = $newReference; // ✅ ใช้ชื่อที่ไม่ซ้ำ
+        $backorder->reference = $newReference;
 
-        // Status Logic: Picking -> Ready, Others -> Waiting
         if ($original->type === 'picking') {
             $backorder->status = 'ready';
         } else {
@@ -242,17 +277,16 @@ class OperationsController extends Controller
 
         $backorder->is_backorder = true;
         $backorder->previous_transfer_id = $original->previous_transfer_id;
+        $backorder->origin_transfer_id = $original->id; // ✅ Link Backorder
         $backorder->save();
 
         foreach ($original->moves as $move) {
             $remaining = $move->quantity_demand - $move->quantity_done;
 
             if ($remaining > 0) {
-                // ปรับยอดใบเก่า
                 $move->quantity_demand = $move->quantity_done;
                 $move->save();
 
-                // สร้าง Move ในใบ Backorder
                 $newMove = $move->replicate(['uuid', 'transfer_id', 'state', 'created_at', 'updated_at']);
                 $newMove->uuid = Str::uuid();
                 $newMove->transfer_id = $backorder->id;
@@ -302,15 +336,15 @@ class OperationsController extends Controller
 
     protected function propagateBackorderChain(StockTransfer $originalDoc, StockTransfer $parentBackorder)
     {
-        // ใช้ Helper สร้าง Reference ใหม่เช่นกัน
         $newReference = $this->generateBackorderReference($originalDoc->reference);
 
         $newBackorder = $originalDoc->replicate(['uuid', 'reference', 'status', 'created_at', 'updated_at']);
         $newBackorder->uuid = Str::uuid();
-        $newBackorder->reference = $newReference; // ✅ ใช้ชื่อที่ไม่ซ้ำ
+        $newBackorder->reference = $newReference;
         $newBackorder->status = 'waiting';
         $newBackorder->is_backorder = true;
         $newBackorder->previous_transfer_id = $parentBackorder->id;
+        $newBackorder->origin_transfer_id = $originalDoc->id; // ✅ Link Chain
         $newBackorder->save();
 
         if ($parentBackorder->moves->isEmpty()) $parentBackorder->load('moves');

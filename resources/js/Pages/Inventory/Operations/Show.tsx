@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { Badge } from '@/Components/ui/badge';
 import { Separator } from '@/Components/ui/separator';
+import { Input } from '@/Components/ui/input';
 import {
     ArrowLeft,
     ArrowRight,
@@ -20,17 +21,56 @@ import {
     AlertCircle,
     Clock,
     PlayCircle,
-    Copy, // Icon สำหรับ Backorder
-    RefreshCw
+    Copy,
+    RefreshCw,
+    Pencil,
+    Save,
+    X
 } from 'lucide-react';
 
-// ✅ รับ prop 'backorder' เพิ่มเข้ามา
 export default function OperationsShow({ transfer, backorder }: { transfer: any, backorder?: any }) {
+
+    // State สำหรับการแก้ไข Inline
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [tempQty, setTempQty] = useState<string>("");
 
     const handleValidate = () => {
         if (confirm('Confirm validation? Inventory will be updated.')) {
             router.post(route('inventory.ops.validate', transfer.id));
         }
+    };
+
+    const handleCheckAvailability = () => {
+        router.post(route('inventory.ops.check', transfer.id));
+    };
+
+    // เริ่มแก้ไข (กดดินสอ)
+    const startEdit = (move: any) => {
+        setEditingId(move.id);
+        setTempQty(move.quantity_done.toString());
+    };
+
+    // ยกเลิกแก้ไข
+    const cancelEdit = () => {
+        setEditingId(null);
+        setTempQty("");
+    };
+
+    // บันทึกค่า (Save)
+    const saveEdit = (moveId: number, maxQty: number) => {
+        const val = parseFloat(tempQty);
+
+        // Validation: ห้ามใส่เกิน
+        if (isNaN(val) || val < 0) return alert("Invalid quantity");
+        if (val > maxQty) return alert(`Cannot exceed available stock (${maxQty})`);
+
+        router.post(route('inventory.ops.move.update'), {
+            move_id: moveId,
+            quantity_done: val
+        }, {
+            onSuccess: () => setEditingId(null),
+            preserveScroll: true
+        });
     };
 
     // Helper: Status Color & Icon
@@ -53,9 +93,10 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
         );
     };
 
-    const handleCheckAvailability = () => {
-        router.post(route('inventory.ops.check', transfer.id));
-    };
+    // Logic: เช็คว่ามีของให้ Validate ไหม (ถ้า Stock = 0 ทุกรายการ จะซ่อนปุ่ม)
+    // แต่ถ้าเป็นใบรับของ (Incoming) ไม่ต้องเช็ค On Hand เพราะเรารับเข้า
+    const isIncoming = transfer.type === 'incoming';
+    const hasStockToProcess = isIncoming || transfer.moves.some((m: any) => m.on_hand > 0);
 
     return (
         <AuthenticatedLayout
@@ -67,6 +108,7 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                             {transfer.type === 'picking' && <Layers className="w-6 h-6 text-indigo-600" />}
                             {transfer.type === 'packing' && <Package className="w-6 h-6 text-orange-600" />}
                             {transfer.type === 'outgoing' && <Truck className="w-6 h-6 text-green-600" />}
+                            {transfer.type === 'incoming' && <ArrowLeft className="w-6 h-6 text-blue-600" />}
                         </div>
                         <div>
                             <div className="flex items-center gap-3">
@@ -96,11 +138,8 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                     <div className="flex items-center gap-3">
                         {transfer.status !== 'done' ? (
                             <>
-                                <Link href={route('inventory.ops.edit', transfer.id)}>
-                                    <Button variant="outline" className="bg-white hover:bg-gray-50 border-gray-300 text-gray-700 shadow-sm">Edit</Button>
-                                </Link>
-
-                                {transfer.status === 'waiting' && (
+                                {/* ปุ่ม Check Availability (เฉพาะขาออกที่สถานะ Waiting) */}
+                                {!isIncoming && transfer.status === 'waiting' && (
                                     <Button
                                         onClick={handleCheckAvailability}
                                         className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
@@ -109,8 +148,8 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                                     </Button>
                                 )}
 
-                                {/* ปุ่ม Validate (แสดงเมื่อ Ready หรือไม่ใช่ Waiting) */}
-                                {transfer.status !== 'waiting' && (
+                                {/* ปุ่ม Validate */}
+                                {transfer.status !== 'waiting' && hasStockToProcess && (
                                     <Button
                                         onClick={handleValidate}
                                         className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
@@ -135,8 +174,7 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
             <div className="py-8 bg-gray-50/30 min-h-screen">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
-                    {/* ✅ NEW: Backorder Notification Alert */}
-                    {/* ถ้ามี Backorder ให้แสดง Card แจ้งเตือนพร้อมปุ่มกดไปหา */}
+                    {/* Backorder Notification Alert */}
                     {backorder && (
                         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
                             <div className="flex items-center gap-3">
@@ -160,7 +198,6 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
 
                     {/* 1. MODERN SMART NAVIGATION */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                         {/* Previous Link */}
                         {transfer.previous_transfer ? (
                             <Link href={route('inventory.ops.show', transfer.previous_transfer.id)} className="group block h-full">
@@ -319,41 +356,82 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                                                 <tr>
                                                     <th className="px-6 py-4 text-left">Product</th>
                                                     <th className="px-6 py-4 text-right">Demand</th>
-                                                    <th className="px-6 py-4 text-right w-32">Reserved</th>
-                                                    <th className="px-6 py-4 text-right w-32">Done</th>
+                                                    {!isIncoming && <th className="px-6 py-4 text-right text-blue-600">On Hand</th>}
+                                                    <th className="px-6 py-4 text-right w-48">Done</th>
                                                     <th className="px-6 py-4 text-center w-24">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
                                                 {transfer.moves.map((move: any) => {
-                                                    const isPartial = move.quantity_done > 0 && move.quantity_done < move.quantity_demand;
-                                                    const isComplete = move.quantity_done >= move.quantity_demand;
+                                                    const isEditing = editingId === move.id;
+                                                    // คำนวณขีดจำกัด
+                                                    // Incoming: ไม่จำกัด (หรือจำกัดตาม Demand ก็ได้ แต่ปกติรับเกินได้)
+                                                    // Outgoing: ห้ามเกิน On Hand
+                                                    const maxLimit = isIncoming ? 999999 : move.on_hand;
 
                                                     return (
                                                         <tr key={move.id} className="hover:bg-gray-50/80 transition-colors group">
                                                             <td className="px-6 py-4">
-                                                                <div className="font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{move.item.name}</div>
+                                                                <div className="font-semibold text-gray-900">{move.item.name}</div>
                                                                 <div className="text-xs text-gray-400 font-mono mt-0.5">Code: {move.item.id}</div>
                                                             </td>
                                                             <td className="px-6 py-4 text-right">
                                                                 <span className="font-medium text-gray-700">{Number(move.quantity_demand).toLocaleString()}</span>
-                                                                <span className="text-xs ml-1 text-gray-400">{move.item.uom.symbol}</span>
                                                             </td>
-                                                            <td className="px-6 py-4 text-right text-gray-500 font-mono">
-                                                                {transfer.status === 'ready' ? Number(move.quantity_demand).toLocaleString() : '-'}
-                                                            </td>
+
+                                                            {!isIncoming && (
+                                                                <td className="px-6 py-4 text-right font-mono text-blue-600 font-bold">
+                                                                    {Number(move.on_hand).toLocaleString()}
+                                                                </td>
+                                                            )}
+
+                                                            {/* ช่อง Done แบบ Inline Edit */}
                                                             <td className="px-6 py-4 text-right">
-                                                                <div className={`font-bold inline-flex items-center px-2 py-0.5 rounded-md ${isPartial ? 'bg-orange-50 text-orange-700' : (isComplete && transfer.status === 'done' ? 'bg-green-50 text-green-700' : 'text-gray-400')}`}>
-                                                                    {transfer.status === 'done' ? Number(move.quantity_done).toLocaleString() : (
-                                                                        <span className="text-xs font-normal italic">Pending</span>
-                                                                    )}
-                                                                </div>
+                                                                {isEditing ? (
+                                                                    <div className="flex items-center justify-end gap-2">
+                                                                        <Input
+                                                                            type="number"
+                                                                            className="w-20 h-8 text-right text-sm"
+                                                                            value={tempQty}
+                                                                            onChange={(e) => {
+                                                                                const val = parseFloat(e.target.value);
+                                                                                if (!isIncoming && val > maxLimit) return;
+                                                                                setTempQty(e.target.value);
+                                                                            }}
+                                                                            min={0}
+                                                                            max={isIncoming ? undefined : maxLimit}
+                                                                            autoFocus
+                                                                        />
+                                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50" onClick={() => saveEdit(move.id, maxLimit)}>
+                                                                            <Save className="w-4 h-4" />
+                                                                        </Button>
+                                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50" onClick={cancelEdit}>
+                                                                            <X className="w-4 h-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center justify-end gap-2">
+                                                                        <span className={`font-bold text-lg ${move.quantity_done > 0 ? 'text-green-700' : 'text-gray-300'}`}>
+                                                                            {Number(move.quantity_done).toLocaleString()}
+                                                                        </span>
+                                                                        {/* แสดงดินสอเฉพาะตอนยังไม่จบงาน และ (สำหรับขาออก ต้องมีของ / ขาเข้า แก้ได้ตลอด) */}
+                                                                        {transfer.status !== 'done' && (isIncoming || move.on_hand > 0) && (
+                                                                            <button onClick={() => startEdit(move)} className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors">
+                                                                                <Pencil className="w-3.5 h-3.5" />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                                {isEditing && !isIncoming && (
+                                                                    <div className="text-[10px] text-gray-400 mt-1">
+                                                                        Max: {maxLimit}
+                                                                    </div>
+                                                                )}
                                                             </td>
+
                                                             <td className="px-6 py-4 text-center">
                                                                 {move.state === 'done' ? (
-                                                                    <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center mx-auto">
-                                                                        <CheckCircle className="w-4 h-4" />
-                                                                    </div>
+                                                                    <CheckCircle className="w-5 h-5 text-green-600 mx-auto" />
                                                                 ) : (
                                                                     <div className="w-2 h-2 bg-orange-300 rounded-full mx-auto" />
                                                                 )}
