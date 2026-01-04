@@ -109,11 +109,11 @@ class PurchaseOrderController extends Controller
     // ปุ่ม Confirm
     public function confirm($id, ConfirmPurchaseOrderAction $action)
     {
-        $order = PurchaseOrder::findOrFail($id);
+        $order = PurchaseOrder::with('lines')->findOrFail($id);
 
         try {
             $action->execute($order);
-            return back()->with('success', 'Order confirmed and stock move created.');
+            return back()->with('success', 'Purchase Order confirmed and Receipt created.');
         } catch (\Exception $e) {
             return back()->with('error', $e->getMessage());
         }

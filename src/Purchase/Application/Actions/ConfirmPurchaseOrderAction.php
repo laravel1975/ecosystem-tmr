@@ -9,7 +9,7 @@ use TmrEcosystem\Inventory\Application\Actions\CreateStockMoveAction;
 use TmrEcosystem\Inventory\Application\DTOs\StockMoveData;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTransfer;
-use TmrEcosystem\Inventory\Application\Services\DocumentNumberService; // Inject Service
+use TmrEcosystem\Inventory\Application\Services\DocumentNumberService;
 
 class ConfirmPurchaseOrderAction
 {
@@ -18,50 +18,62 @@ class ConfirmPurchaseOrderAction
         protected DocumentNumberService $docService
     ) {}
 
-    public function execute(PurchaseOrder $po): void
+    public function execute(PurchaseOrder $order): void
     {
-        if ($po->status !== 'draft') throw new \Exception("PO is not draft");
+        // 1. Validation
+        if ($order->status !== 'draft') {
+            throw new \Exception("Purchase Order {$order->code} is already confirmed.");
+        }
 
-        DB::transaction(function () use ($po) {
-            $sourceLoc = InventoryLocation::where('usage', 'supplier')->firstOrFail();
-            $destLoc = InventoryLocation::where('usage', 'internal')->firstOrFail();
+        DB::transaction(function () use ($order) {
+            // 2. เตรียม Locations (Vendor -> Stock)
+            // หา Location ของ Supplier (ต้นทาง)
+            $vendorLoc = InventoryLocation::where('usage', 'supplier')->firstOrFail();
 
-            // 1. สร้าง Header เอกสาร (IN26-xxxxxx)
+            // หา Location ของ Stock เรา (ปลายทาง)
+            $stockLoc = InventoryLocation::where('usage', 'internal')
+                ->where('name', '!=', 'Packing Zone')
+                ->where('name', '!=', 'Output Zone')
+                ->firstOrFail();
+
+            // 3. สร้าง Header เอกสาร Receipt (Incoming)
             $transfer = StockTransfer::create([
                 'uuid' => Str::uuid(),
-                'reference' => $this->docService->generateNextNumber('incoming'),
+                'reference' => $this->docService->generateNextNumber('incoming'), // เช่น IN-20260104-001
                 'type' => 'incoming',
-                'source_location_id' => $sourceLoc->id,
-                'destination_location_id' => $destLoc->id,
-                'contact_id' => $po->vendor_id,
-                'status' => 'ready',
-                'scheduled_date' => $po->date_expected ?? now(),
+                'source_location_id' => $vendorLoc->id,
+                'destination_location_id' => $stockLoc->id,
+                'contact_id' => $order->vendor_id, // Vendor ID
+                'status' => 'ready', // ของมาถึงแล้ว พร้อมตรวจรับทันที
+                'scheduled_date' => $order->date_expected ?? now(),
+                'source_document' => $order->code, // Link กลับหา PO
             ]);
 
-            // 2. สร้าง Lines (Moves)
-            foreach ($po->lines as $line) {
+            // 4. สร้าง Moves (รายการสินค้าที่จะรับ)
+            foreach ($order->lines as $line) {
                 $moveData = new StockMoveData(
                     uuid: null,
                     item_id: $line->item_id,
-                    source_location_id: $sourceLoc->id,
-                    destination_location_id: $destLoc->id,
+                    source_location_id: $vendorLoc->id,
+                    destination_location_id: $stockLoc->id,
                     quantity_demand: $line->quantity,
                     quantity_done: 0,
-                    state: 'confirmed', // รอรับ
+                    state: 'confirmed', // จองพื้นที่/รอรับ
                     batch_number: null,
-                    date_expected: $po->date_expected ?? now()
+                    date_expected: $order->date_expected ?? now()
                 );
 
                 $move = $this->createStockMoveAction->execute($moveData);
 
-                // 3. ผูก Move เข้ากับ Transfer
+                // ผูก Move เข้ากับ Transfer และ PO
                 $move->transfer_id = $transfer->id;
                 $move->reference_type = PurchaseOrder::class;
-                $move->reference_id = $po->id;
+                $move->reference_id = $order->id;
                 $move->save();
             }
 
-            $po->update(['status' => 'confirmed']);
+            // 5. อัปเดตสถานะ PO เป็น Confirmed
+            $order->update(['status' => 'confirmed']);
         });
     }
 }
