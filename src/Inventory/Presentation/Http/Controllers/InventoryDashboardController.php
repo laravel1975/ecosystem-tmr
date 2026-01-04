@@ -4,71 +4,34 @@ namespace TmrEcosystem\Inventory\Presentation\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Inertia\Inertia;
-use Inertia\Response;
-use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryItem;
-use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMove;
+use Illuminate\Support\Facades\DB;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTransfer;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockQuant;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\InventoryLocation;
 
 class InventoryDashboardController extends Controller
 {
-    public function __invoke(): Response
+    public function index()
     {
-        // 1. Items (เหมือนเดิม)
-        $items = InventoryItem::with(['category', 'uom', 'stockQuants' => function ($query) {
-            $query->whereHas('location', function ($q) {
-                $q->where('usage', 'internal');
-            });
-        }])->get()->map(function ($item) {
-            return [
-                'id' => $item->id,
-                'sku' => $item->sku,
-                'name' => $item->name,
-                'category' => $item->category->name ?? '-',
-                'uom' => $item->uom->symbol,
-                'price' => $item->price,
-                'on_hand' => $item->stockQuants->sum('quantity'),
-            ];
-        });
+        // 1. Overview Cards: นับจำนวนเอกสารที่รออนุมัติ (Waiting/Ready) แยกตามประเภท
+        $stats = [
+            'incoming' => StockTransfer::where('type', 'incoming')->whereIn('status', ['waiting', 'ready'])->count(),
+            'picking'  => StockTransfer::where('type', 'picking')->whereIn('status', ['waiting', 'ready'])->count(),
+            'packing'  => StockTransfer::where('type', 'packing')->whereIn('status', ['waiting', 'ready'])->count(),
+            'outgoing' => StockTransfer::where('type', 'outgoing')->whereIn('status', ['waiting', 'ready'])->count(),
+        ];
 
-        // 2. Incoming Moves (ของเข้า - เหมือนเดิม)
-        $incomingMoves = StockMove::with(['item.uom', 'sourceLocation'])
-            ->where('state', 'confirmed')
-            ->whereHas('destinationLocation', fn($q) => $q->where('usage', 'internal'))
-            ->orderBy('date_expected')
-            ->get()
-            ->map(function ($move) {
-                return [
-                    'id' => $move->id,
-                    'item_name' => $move->item->name ?? 'Unknown',
-                    'qty' => (float) $move->quantity_demand,
-                    'uom' => $move->item->uom->symbol ?? 'Unit',
-                    'source' => $move->sourceLocation->name ?? 'Unknown',
-                    'date' => $move->date_expected ? $move->date_expected->format('Y-m-d') : '-',
-                ];
-            });
-
-        // 3. 👇 เพิ่ม: Outgoing Moves (ของออก - รอส่งลูกค้า)
-        $outgoingMoves = StockMove::with(['item.uom', 'destinationLocation'])
-            ->where('state', 'confirmed')
-            // เงื่อนไข: ออกจาก Internal -> ไป Customer
-            ->whereHas('sourceLocation', fn($q) => $q->where('usage', 'internal'))
-            ->whereHas('destinationLocation', fn($q) => $q->where('usage', 'customer'))
-            ->orderBy('date_expected')
-            ->get()
-            ->map(function ($move) {
-                return [
-                    'id' => $move->id,
-                    'item_name' => $move->item->name ?? 'Unknown',
-                    'qty' => (float) $move->quantity_demand,
-                    'uom' => $move->item->uom->symbol ?? 'Unit',
-                    'destination' => $move->destinationLocation->name ?? 'Customer',
-                    'date' => $move->date_expected ? $move->date_expected->format('Y-m-d') : '-',
-                ];
-            });
+        // 2. Stock Balance: ดึงยอดคงเหลือปัจจุบัน (เฉพาะที่มีของ > 0)
+        // Group by Item และ Location
+        $stocks = StockQuant::with(['item.uom', 'location'])
+            ->where('quantity', '>', 0)
+            ->orderBy('location_id')
+            ->orderBy('item_id')
+            ->paginate(20);
 
         return Inertia::render('Inventory/Dashboard', [
-            'items' => $items,
-            'incomingMoves' => $incomingMoves,
-            'outgoingMoves' => $outgoingMoves,
+            'stats' => $stats,
+            'stocks' => $stocks
         ]);
     }
 }

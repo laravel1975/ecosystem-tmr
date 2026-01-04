@@ -22,7 +22,7 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
     ->group(function () {
 
         // Dashboard: /inventory
-        Route::get('/', InventoryDashboardController::class)->name('dashboard');
+        Route::get('/dashboard', [InventoryDashboardController::class, 'index'])->name('dashboard');
 
         // ตัวอย่าง: ถ้ามี Route อื่นๆ ในอนาคต
         Route::get('/items', [ItemController::class, 'index'])->name('items.index');

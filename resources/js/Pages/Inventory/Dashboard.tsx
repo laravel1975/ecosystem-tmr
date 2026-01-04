@@ -1,235 +1,119 @@
 import React from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
-import { Truck, CheckCircle, PackagePlus, ArrowUpRight, ArrowDownLeft, PackageCheck } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
+import {
+    Package,
+    Truck,
+    Layers,
+    ArrowDownToLine,
+    MapPin,
+    Box
+} from 'lucide-react';
 
-// --- Types Definition ---
+export default function InventoryDashboard({ stats, stocks }: { stats: any, stocks: any }) {
 
-// ข้อมูลสินค้าในตารางหลัก
-interface InventoryItemData {
-    id: number;
-    sku: string;
-    name: string;
-    category: string;
-    uom: string;
-    price: number;
-    on_hand: number;
-}
-
-// ข้อมูลรายการรอรับของ (Incoming)
-interface IncomingMove {
-    id: number;
-    item_name: string;
-    qty: number;
-    uom: string;
-    source: string;
-    date: string;
-}
-
-interface OutgoingMove {
-    id: number;
-    item_name: string;
-    qty: number;
-    uom: string;
-    destination: string;
-    date: string;
-}
-
-// รวม Props ทั้งหมด
-type DashboardProps = PageProps<{
-    items: InventoryItemData[];
-    incomingMoves: IncomingMove[];
-    outgoingMoves: OutgoingMove[];
-}>;
-
-export default function InventoryDashboard({ auth, items, incomingMoves, outgoingMoves }: DashboardProps) {
-
-    // ใช้ useForm สำหรับการยิง Request กดรับของ (Validate)
-    const { post, processing } = useForm();
-
-    const handleValidateMove = (id: number, type: 'receive' | 'deliver') => {
-        const message = type === 'receive'
-            ? 'Confirm receipt of goods?'
-            : 'Confirm delivery to customer? Stock will be deducted.';
-
-        if (window.confirm(message)) {
-            post(route('inventory.moves.validate', id));
-        }
-    };
-
-    // ฟังก์ชันกดปุ่ม Receive ในกล่องแจ้งเตือน
-    const handleReceive = (id: number) => {
-        if (window.confirm('Confirm receipt of these goods into stock?')) {
-            post(route('inventory.moves.validate', id));
-        }
-    };
-
-    // ฟังก์ชันจัดรูปแบบเงิน (THB)
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(amount);
-    };
+    // Helper สร้าง Card เมนู
+    const OperationCard = ({ title, count, type, icon: Icon, color }: any) => (
+        <Link href={route('inventory.ops.index', type)}>
+            <Card className="hover:shadow-lg transition-all cursor-pointer border-l-4" style={{ borderLeftColor: color }}>
+                <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                        <div className="text-gray-500 text-sm font-medium uppercase tracking-wider">{title}</div>
+                        <div className="text-3xl font-bold mt-2 text-gray-800">{count}</div>
+                        <div className="text-xs text-gray-400 mt-1">To Process</div>
+                    </div>
+                    <div className={`p-4 rounded-full bg-opacity-10`} style={{ backgroundColor: color }}>
+                        <Icon className="w-8 h-8" style={{ color: color }} />
+                    </div>
+                </CardContent>
+            </Card>
+        </Link>
+    );
 
     return (
         <AuthenticatedLayout
-            user={auth.user}
-            header={
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold leading-tight text-gray-800 dark:text-gray-200">
-                        Inventory Dashboard
-                    </h2>
-                </div>
-            }
+            header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Inventory Overview</h2>}
         >
-            <Head title="Inventory" />
+            <Head title="Inventory Dashboard" />
 
             <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
 
-                    {/* ---------------------------------------------------------
-                        SECTION 1: Action Buttons (ปุ่มทางลัด)
-                       --------------------------------------------------------- */}
-                    <div className="flex flex-wrap gap-3 justify-end">
-                        <Link
-                            href={route('inventory.operations.receive')}
-                            className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150"
-                        >
-                            <ArrowDownLeft className="w-4 h-4 mr-2 text-green-600" />
-                            Direct Receive
-                        </Link>
-
-                        <Link
-                            href={route('inventory.operations.delivery')}
-                            className="inline-flex items-center px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md font-semibold text-xs text-gray-700 dark:text-gray-300 uppercase tracking-widest shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-25 transition ease-in-out duration-150"
-                        >
-                            <ArrowUpRight className="w-4 h-4 mr-2 text-orange-600" />
-                            Direct Delivery
-                        </Link>
-
-                        <Link
-                            href={route('inventory.items.create')}
-                            className="inline-flex items-center px-4 py-2 bg-indigo-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-indigo-500 focus:bg-indigo-700 active:bg-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition ease-in-out duration-150"
-                        >
-                            <PackagePlus className="w-4 h-4 mr-2" />
-                            New Product
-                        </Link>
+                    {/* 1. Operation Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <OperationCard
+                            title="Receipts"
+                            count={stats.incoming}
+                            type="incoming"
+                            icon={ArrowDownToLine}
+                            color="#10B981" // Green
+                        />
+                        <OperationCard
+                            title="Internal Picking"
+                            count={stats.picking}
+                            type="picking"
+                            icon={Layers}
+                            color="#3B82F6" // Blue
+                        />
+                        <OperationCard
+                            title="Packing"
+                            count={stats.packing}
+                            type="packing"
+                            icon={Box}
+                            color="#F59E0B" // Amber
+                        />
+                        <OperationCard
+                            title="Delivery Orders"
+                            count={stats.outgoing}
+                            type="outgoing"
+                            icon={Truck}
+                            color="#6366F1" // Indigo
+                        />
                     </div>
 
-                    {/* ---------------------------------------------------------
-                        SECTION 2: Pending Receipts (งานรอรับของ) - แสดงเฉพาะเมื่อมีข้อมูล
-                       --------------------------------------------------------- */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* ---------------------------------------------------------
-                            SECTION 2.1: Pending Receipts (Incoming) - สีส้ม
-                           --------------------------------------------------------- */}
-                        {incomingMoves && incomingMoves.length > 0 ? (
-                            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-6">
-                                <h3 className="text-lg font-bold text-orange-800 dark:text-orange-300 flex items-center mb-4">
-                                    <Truck className="w-5 h-5 mr-2" /> Pending Receipts
-                                </h3>
-                                {/* ... Table Incoming เดิม ... */}
-                                <div className="bg-white dark:bg-gray-800 rounded shadow overflow-hidden border border-orange-100 dark:border-gray-700">
-                                    <table className="min-w-full text-sm">
-                                        {/* ... Table Header/Body ... */}
-                                        <tbody className="divide-y divide-gray-100">
-                                            {incomingMoves.map(move => (
-                                                <tr key={move.id}>
-                                                    {/* ... colums ... */}
-                                                    <td className="px-4 py-2 text-right">
-                                                        <button onClick={() => handleValidateMove(move.id, 'receive')} className="text-green-600 hover:underline font-bold">Receive</button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    {/* 2. Current Stock Balance Table */}
+                    <Card>
+                        <CardHeader className="border-b bg-gray-50">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-5 h-5 text-gray-500" />
+                                <CardTitle>Current Stock Balance</CardTitle>
                             </div>
-                        ) : null}
-
-                        {/* ---------------------------------------------------------
-                            SECTION 2.2: Pending Deliveries (Outgoing) - สีฟ้า [NEW!]
-                           --------------------------------------------------------- */}
-                        {outgoingMoves && outgoingMoves.length > 0 ? (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-                                <h3 className="text-lg font-bold text-blue-800 dark:text-blue-300 flex items-center mb-4">
-                                    <PackageCheck className="w-5 h-5 mr-2" /> Pending Deliveries
-                                </h3>
-                                <div className="bg-white dark:bg-gray-800 rounded shadow overflow-hidden border border-blue-100 dark:border-gray-700">
-                                    <table className="min-w-full text-sm">
-                                        <thead className="bg-gray-50 dark:bg-gray-700">
-                                            <tr>
-                                                <th className="px-4 py-2 text-left text-xs font-bold text-gray-500 uppercase">Product</th>
-                                                <th className="px-4 py-2 text-right text-xs font-bold text-gray-500 uppercase">Qty</th>
-                                                <th className="px-4 py-2 text-center text-xs font-bold text-gray-500 uppercase">Action</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                            {outgoingMoves.map(move => (
-                                                <tr key={move.id} className="hover:bg-blue-50/50 transition">
-                                                    <td className="px-4 py-3">
-                                                        <div className="font-medium text-gray-900">{move.item_name}</div>
-                                                        <div className="text-xs text-gray-500">To: {move.destination}</div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-bold text-blue-600">
-                                                        {move.qty} <span className="text-xs font-normal text-gray-500">{move.uom}</span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <button
-                                                            onClick={() => handleValidateMove(move.id, 'deliver')}
-                                                            disabled={processing}
-                                                            className="inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded shadow-sm transition-colors"
-                                                        >
-                                                            <CheckCircle className="w-3 h-3 mr-1" />
-                                                            Deliver
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        ) : null}
-                    </div>
-
-                    {/* ---------------------------------------------------------
-                        SECTION 3: Stock Overview (ตารางสินค้าคงเหลือ)
-                       --------------------------------------------------------- */}
-                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                        <div className="p-6 text-gray-900 dark:text-gray-100">
-                            <h3 className="text-lg font-medium mb-4">Stock Overview</h3>
-
+                        </CardHeader>
+                        <CardContent className="p-0">
                             <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                                    <thead className="bg-gray-50 dark:bg-gray-700">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="text-gray-500 bg-gray-50 uppercase border-b">
                                         <tr>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">SKU</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
-                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">On Hand</th>
-                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Price</th>
+                                            <th className="px-6 py-3">Location</th>
+                                            <th className="px-6 py-3">Product</th>
+                                            <th className="px-6 py-3 text-right">On Hand</th>
+                                            <th className="px-6 py-3 text-center">Unit</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                                        {items.map((item) => (
-                                            <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                                                    {item.sku}
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm">{item.name}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.category}</td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold">
-                                                    {item.on_hand} <span className="text-xs text-gray-500 font-normal">{item.uom}</span>
-                                                </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                                                    {formatCurrency(item.price)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        {items.length === 0 && (
+                                    <tbody className="divide-y divide-gray-100">
+                                        {stocks.data.length > 0 ? (
+                                            stocks.data.map((stock: any) => (
+                                                <tr key={stock.id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 font-medium text-indigo-600">
+                                                        {stock.location?.name}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-gray-700">{stock.item?.name}</div>
+                                                        <div className="text-xs text-gray-400">Code: {stock.item?.id}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right font-bold text-gray-800 text-lg">
+                                                        {Number(stock.quantity).toLocaleString()}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center text-gray-500">
+                                                        {stock.item?.uom?.symbol}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
                                             <tr>
-                                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                                                    No items found. Click "+ New Product" to start.
+                                                <td colSpan={4} className="px-6 py-10 text-center text-gray-400">
+                                                    No stock available currently.
                                                 </td>
                                             </tr>
                                         )}
@@ -237,8 +121,24 @@ export default function InventoryDashboard({ auth, items, incomingMoves, outgoin
                                 </table>
                             </div>
 
-                        </div>
-                    </div>
+                            {/* Pagination (Simple) */}
+                            {stocks.links && (
+                                <div className="p-4 border-t flex justify-end gap-2">
+                                    {stocks.links.map((link: any, key: number) => (
+                                        link.url ? (
+                                            <Link
+                                                key={key}
+                                                href={link.url}
+                                                className={`px-3 py-1 rounded border text-xs ${link.active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                            />
+                                        ) : null
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
                 </div>
             </div>
         </AuthenticatedLayout>
