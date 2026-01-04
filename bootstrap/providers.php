@@ -1,5 +1,6 @@
 <?php
 
+use TmrEcosystem\IAM\Infrastructure\Providers\IAMServiceProvider;
 use TmrEcosystem\Inventory\Infrastructure\Providers\InventoryServiceProvider;
 use TmrEcosystem\Purchase\Infrastructure\Providers\PurchaseServiceProvider;
 use TmrEcosystem\Sales\Infrastructure\Providers\SalesServiceProvider;
@@ -9,4 +10,5 @@ return [
     InventoryServiceProvider::class,
     PurchaseServiceProvider::class,
     SalesServiceProvider::class,
+    IAMServiceProvider::class,
 ];

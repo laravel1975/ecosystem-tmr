@@ -2,10 +2,10 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use TmrEcosystem\IAM\Infrastructure\Persistence\Eloquent\Models\User;
 use TmrEcosystem\Inventory\Infrastructure\Database\Seeders\InventoryLocationSeeder;
 use TmrEcosystem\Inventory\Infrastructure\Database\Seeders\InventoryMasterDataSeeder;
 
