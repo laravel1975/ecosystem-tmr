@@ -45,11 +45,11 @@ class ConfirmSalesOrderAction
 
             // ---------------------------------------------------------
             // Step 1: Picking (Stock -> Pack)
-            // สถานะ: Ready (พร้อมให้พนักงานไปหยิบของทันที)
+            // สถานะ: Waiting (เปลี่ยนจาก Ready เป็น Waiting เพื่อรอ Check Availability)
             // ---------------------------------------------------------
             $picking = $this->createTransfer(
                 type: 'picking',
-                status: 'ready',
+                status: 'waiting', // ✅ แก้ไข: เริ่มต้นที่ Waiting
                 sourceId: $stockLoc->id,
                 destId: $packLoc->id,
                 order: $order,
@@ -103,7 +103,7 @@ class ConfirmSalesOrderAction
             'status' => $status, // ready หรือ waiting
             'scheduled_date' => $order->date_delivery_expected ?? now(),
             'previous_transfer_id' => $prevId, // กุญแจสำคัญในการเชื่อมโยง Chain
-            'source_document' => $order->code, // ✅ เพิ่มตรงนี้: บันทึกเลขที่ SO ลงในเอกสาร
+            'source_document' => $order->code, // บันทึกเลขที่ SO ลงในเอกสาร
         ]);
 
         // 2. วนลูปสินค้าสร้าง Lines (Stock Moves)

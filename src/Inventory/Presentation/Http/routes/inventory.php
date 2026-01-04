@@ -43,6 +43,7 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
         Route::get('/ops/{type}', [OperationsController::class, 'index'])->name('ops.index');
         Route::get('/ops/doc/{id}', [OperationsController::class, 'show'])->name('ops.show');
         Route::post('/ops/doc/{id}/validate', [OperationsController::class, 'validateTransfer'])->name('ops.validate');
+        Route::post('/ops/doc/{id}/check', [OperationsController::class, 'checkAvailability'])->name('ops.check');
         Route::get('/ops/doc/{id}/edit', [OperationsController::class, 'edit'])->name('ops.edit');
         Route::put('/ops/doc/{id}', [OperationsController::class, 'update'])->name('ops.update');
         Route::get('/ops/doc/{id}/print', [TransferPrintController::class, 'print'])->name('ops.print');

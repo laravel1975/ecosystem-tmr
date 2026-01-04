@@ -20,7 +20,8 @@ import {
     AlertCircle,
     Clock,
     PlayCircle,
-    Copy // Icon สำหรับ Backorder
+    Copy, // Icon สำหรับ Backorder
+    RefreshCw
 } from 'lucide-react';
 
 // ✅ รับ prop 'backorder' เพิ่มเข้ามา
@@ -50,6 +51,10 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                 {status}
             </span>
         );
+    };
+
+    const handleCheckAvailability = () => {
+        router.post(route('inventory.ops.check', transfer.id));
     };
 
     return (
@@ -94,15 +99,25 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                                 <Link href={route('inventory.ops.edit', transfer.id)}>
                                     <Button variant="outline" className="bg-white hover:bg-gray-50 border-gray-300 text-gray-700 shadow-sm">Edit</Button>
                                 </Link>
-                                <Button
-                                    onClick={handleValidate}
-                                    className={`shadow-sm transition-all ${transfer.status === 'waiting'
-                                        ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed hover:bg-gray-100'
-                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'}`}
-                                    disabled={transfer.status === 'waiting'}
-                                >
-                                    <CheckCircle className="w-4 h-4 mr-2" /> Validate
-                                </Button>
+
+                                {transfer.status === 'waiting' && (
+                                    <Button
+                                        onClick={handleCheckAvailability}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                    >
+                                        <RefreshCw className="w-4 h-4 mr-2" /> Check Availability
+                                    </Button>
+                                )}
+
+                                {/* ปุ่ม Validate (แสดงเมื่อ Ready หรือไม่ใช่ Waiting) */}
+                                {transfer.status !== 'waiting' && (
+                                    <Button
+                                        onClick={handleValidate}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
+                                    >
+                                        <CheckCircle className="w-4 h-4 mr-2" /> Validate
+                                    </Button>
+                                )}
                             </>
                         ) : (
                             <a href={route('inventory.ops.print', transfer.id)} target="_blank" rel="noopener noreferrer">
@@ -194,8 +209,8 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                                                         <div className="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-0.5 flex items-center gap-2">
                                                             Next Step
                                                             {next.status === 'ready' && <span className="relative flex h-2 w-2">
-                                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                                                             </span>}
                                                         </div>
                                                         <div className="font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors text-lg">{next.reference}</div>

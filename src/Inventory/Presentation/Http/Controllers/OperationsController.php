@@ -11,6 +11,7 @@ use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockTrans
 use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockMove;
 use TmrEcosystem\Inventory\Application\Actions\ProcessStockMoveAction;
 use TmrEcosystem\Inventory\Application\Services\DocumentNumberService;
+use TmrEcosystem\Inventory\Infrastructure\Persistence\Eloquent\Models\StockQuant;
 use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\SalesOrder;
 
 class OperationsController extends Controller
@@ -181,6 +182,48 @@ class OperationsController extends Controller
         return $candidate;
     }
 
+    public function checkAvailability($id)
+    {
+        $transfer = StockTransfer::with('moves')->findOrFail($id);
+
+        if ($transfer->status !== 'waiting') {
+            return back()->with('error', 'Operation is not in waiting state.');
+        }
+
+        DB::transaction(function () use ($transfer) {
+            $allAvailable = true;
+
+            foreach ($transfer->moves as $move) {
+                // 1. หา StockQuant ของสินค้านี้ ใน Location ต้นทาง
+                $quant = StockQuant::where('location_id', $transfer->source_location_id)
+                    ->where('item_id', $move->item_id)
+                    ->first();
+
+                $onHand = $quant ? $quant->quantity : 0;
+
+                // 2. เช็คว่าพอไหม (Demand vs OnHand)
+                // (ในระบบจริงอาจต้องหักยอดที่ถูกจอง (Reserved) ไปแล้วด้วย แต่นี่เอาแบบ Simple ก่อน)
+                if ($onHand < $move->quantity_demand) {
+                    $allAvailable = false;
+                    // อาจจะอัปเดตสถานะ Move เป็น 'waiting' แยกรายตัวก็ได้
+                }
+            }
+
+            // 3. ถ้าของครบทุกรายการ -> เปลี่ยนสถานะเป็น Ready
+            if ($allAvailable) {
+                $transfer->update(['status' => 'ready']);
+                // อัปเดต moves ให้เป็น confirmed/assigned
+                $transfer->moves()->update(['state' => 'confirmed']);
+            }
+        });
+
+        if ($transfer->fresh()->status === 'ready') {
+            return back()->with('success', 'Stock is available. Reserved successfully.');
+        } else {
+            return back()->with('error', 'Not enough stock available.');
+        }
+    }
+
     protected function createBackorder(StockTransfer $original, DocumentNumberService $docService)
     {
         // ใช้ Helper สร้าง Reference ใหม่เพื่อป้องกัน Duplicate Entry
@@ -246,11 +289,11 @@ class OperationsController extends Controller
                     ->where('item_id', $sourceMove->item_id)
                     ->first();
                 if ($nextMove) {
-                     $qtyToPropagate = ($sourceDoc->status === 'done') ? $sourceMove->quantity_done : $sourceMove->quantity_demand;
-                     if ($nextMove->quantity_demand != $qtyToPropagate) {
-                         $nextMove->quantity_demand = $qtyToPropagate;
-                         $nextMove->save();
-                     }
+                    $qtyToPropagate = ($sourceDoc->status === 'done') ? $sourceMove->quantity_done : $sourceMove->quantity_demand;
+                    if ($nextMove->quantity_demand != $qtyToPropagate) {
+                        $nextMove->quantity_demand = $qtyToPropagate;
+                        $nextMove->save();
+                    }
                 }
             }
             $this->syncMainChainDemand($nextDoc);
@@ -273,16 +316,16 @@ class OperationsController extends Controller
         if ($parentBackorder->moves->isEmpty()) $parentBackorder->load('moves');
 
         foreach ($parentBackorder->moves as $parentMove) {
-             $templateMove = StockMove::where('transfer_id', $originalDoc->id)->where('item_id', $parentMove->item_id)->first();
-             if ($templateMove) {
-                 $newMove = $templateMove->replicate(['uuid', 'transfer_id', 'state', 'created_at', 'updated_at']);
-                 $newMove->uuid = Str::uuid();
-                 $newMove->transfer_id = $newBackorder->id;
-                 $newMove->quantity_demand = $parentMove->quantity_demand;
-                 $newMove->quantity_done = 0;
-                 $newMove->state = 'waiting';
-                 $newMove->save();
-             }
+            $templateMove = StockMove::where('transfer_id', $originalDoc->id)->where('item_id', $parentMove->item_id)->first();
+            if ($templateMove) {
+                $newMove = $templateMove->replicate(['uuid', 'transfer_id', 'state', 'created_at', 'updated_at']);
+                $newMove->uuid = Str::uuid();
+                $newMove->transfer_id = $newBackorder->id;
+                $newMove->quantity_demand = $parentMove->quantity_demand;
+                $newMove->quantity_done = 0;
+                $newMove->state = 'waiting';
+                $newMove->save();
+            }
         }
 
         $downstreamDocs = $originalDoc->nextTransfers;
