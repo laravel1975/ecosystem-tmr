@@ -19,10 +19,12 @@ import {
     Calendar,
     AlertCircle,
     Clock,
-    PlayCircle
+    PlayCircle,
+    Copy // Icon สำหรับ Backorder
 } from 'lucide-react';
 
-export default function OperationsShow({ transfer }: { transfer: any }) {
+// ✅ รับ prop 'backorder' เพิ่มเข้ามา
+export default function OperationsShow({ transfer, backorder }: { transfer: any, backorder?: any }) {
 
     const handleValidate = () => {
         if (confirm('Confirm validation? Inventory will be updated.')) {
@@ -103,9 +105,11 @@ export default function OperationsShow({ transfer }: { transfer: any }) {
                                 </Button>
                             </>
                         ) : (
-                            <Button variant="outline" onClick={() => window.print()} className="gap-2 bg-white text-gray-700 hover:bg-gray-50 border-gray-300 shadow-sm">
-                                <Printer className="w-4 h-4" /> Print Operations
-                            </Button>
+                            <a href={route('inventory.ops.print', transfer.id)} target="_blank" rel="noopener noreferrer">
+                                <Button variant="outline" className="gap-2 bg-white text-gray-700 hover:bg-gray-50 border-gray-300 shadow-sm">
+                                    <Printer className="w-4 h-4" /> Print Operations
+                                </Button>
+                            </a>
                         )}
                     </div>
                 </div>
@@ -115,6 +119,29 @@ export default function OperationsShow({ transfer }: { transfer: any }) {
 
             <div className="py-8 bg-gray-50/30 min-h-screen">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-8">
+
+                    {/* ✅ NEW: Backorder Notification Alert */}
+                    {/* ถ้ามี Backorder ให้แสดง Card แจ้งเตือนพร้อมปุ่มกดไปหา */}
+                    {backorder && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-orange-100 rounded-full text-orange-600">
+                                    <Copy className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div className="font-bold text-orange-800">Partial Delivery / Backorder Created</div>
+                                    <div className="text-sm text-orange-600">
+                                        Some items were not processed. A new document <strong>{backorder.reference}</strong> has been created.
+                                    </div>
+                                </div>
+                            </div>
+                            <Link href={route('inventory.ops.show', backorder.id)}>
+                                <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white border-none shadow-orange-200">
+                                    Process Backorder <ArrowRight className="w-4 h-4 ml-2" />
+                                </Button>
+                            </Link>
+                        </div>
+                    )}
 
                     {/* 1. MODERN SMART NAVIGATION */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

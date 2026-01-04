@@ -5,6 +5,7 @@ use TmrEcosystem\Inventory\Presentation\Http\Controllers\InventoryDashboardContr
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\ItemController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\StockMovementController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\OperationsController;
+use TmrEcosystem\Inventory\Presentation\Http\Controllers\TransferPrintController;
 
 /*
 |--------------------------------------------------------------------------
@@ -44,4 +45,5 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
         Route::post('/ops/doc/{id}/validate', [OperationsController::class, 'validateTransfer'])->name('ops.validate');
         Route::get('/ops/doc/{id}/edit', [OperationsController::class, 'edit'])->name('ops.edit');
         Route::put('/ops/doc/{id}', [OperationsController::class, 'update'])->name('ops.update');
+        Route::get('/ops/doc/{id}/print', [TransferPrintController::class, 'print'])->name('ops.print');
     });

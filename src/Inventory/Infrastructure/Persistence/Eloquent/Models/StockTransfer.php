@@ -10,14 +10,13 @@ use TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\Customer;
 
 class StockTransfer extends Model
 {
-    // ใช้ guarded = [] เพื่ออนุญาตให้เติมข้อมูลได้ทุก field (รวมถึง source_document)
     protected $guarded = [];
 
-    // เพิ่ม append attribute เพื่อให้ Inertia ส่ง contact ไปที่ Frontend อัตโนมัติเมื่อมีการเรียก model
+    // ✅ Appends 'contact' เพื่อให้ Frontend (Inertia) เห็นข้อมูลนี้โดยอัตโนมัติ
     protected $appends = ['contact'];
 
     // --------------------------------------------------------------------------
-    // Relationships พื้นฐาน (Moves, Location)
+    // Relationships พื้นฐาน
     // --------------------------------------------------------------------------
 
     public function moves(): HasMany
@@ -36,7 +35,7 @@ class StockTransfer extends Model
     }
 
     // --------------------------------------------------------------------------
-    // Relationships สำหรับ Vendor/Customer (Contact)
+    // Relationships สำหรับ Vendor/Customer
     // --------------------------------------------------------------------------
 
     public function vendor(): BelongsTo
@@ -49,43 +48,36 @@ class StockTransfer extends Model
         return $this->belongsTo(Customer::class, 'contact_id');
     }
 
-    // Accessor สำหรับรวมร่างเป็น 'contact'
+    // ✅ Accessor: รวมร่าง Vendor/Customer ให้เป็น 'contact' object เดียว
+    // เพื่อให้เรียกใช้ได้ง่ายๆ เช่น $transfer->contact->name
     public function getContactAttribute()
     {
         if ($this->type === 'incoming') {
             return $this->vendor;
-        } elseif (in_array($this->type, ['outgoing', 'picking', 'packing'])) {
+        }
+
+        // Picking, Packing, Outgoing ใช้ Customer
+        if (in_array($this->type, ['outgoing', 'picking', 'packing'])) {
             return $this->customer;
         }
+
         return null;
     }
 
     // --------------------------------------------------------------------------
-    // 🔥 Relationships ใหม่สำหรับ Chain Operation & Backorder
+    // Relationships Chain & Backorder
     // --------------------------------------------------------------------------
 
-    /**
-     * ใบก่อนหน้า (Parent) ที่เรากำลังรออยู่
-     * เช่น ใบ Packing (Waiting) จะมี previousTransfer เป็นใบ Picking
-     */
     public function previousTransfer(): BelongsTo
     {
         return $this->belongsTo(StockTransfer::class, 'previous_transfer_id');
     }
 
-    /**
-     * ใบถัดไป (Children) ที่กำลังรอเราอยู่
-     * เช่น ใบ Picking (Ready) จะมี nextTransfers เป็นใบ Packing (Waiting)
-     */
     public function nextTransfers(): HasMany
     {
         return $this->hasMany(StockTransfer::class, 'previous_transfer_id');
     }
 
-    /**
-     * ใบต้นทางสุด (Root) ของกระบวนการ (Optional)
-     * ใช้สำหรับ Track กลับไปหาจุดเริ่มต้นของ Chain นี้
-     */
     public function originTransfer(): BelongsTo
     {
         return $this->belongsTo(StockTransfer::class, 'origin_transfer_id');
