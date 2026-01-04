@@ -16,6 +16,12 @@ class EmployeeData extends Data
         public ?int $user_id,
         public ?int $department_id,
         public ?int $position_id,
-        public ?int $inventory_location_id,
+
+        // ERP Fields
+        public bool $is_salesperson = false,
+        public bool $is_purchaser = false,
+        public bool $is_technician = false,
+        public ?int $default_warehouse_id = null,
+        public ?int $inventory_location_id = null, // Personal Location
     ) {}
 }

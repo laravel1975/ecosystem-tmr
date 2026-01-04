@@ -35,6 +35,7 @@ class DatabaseSeeder extends Seeder
             InventoryMasterDataSeeder::class,
             \TmrEcosystem\Purchase\Infrastructure\Database\Seeders\VendorSeeder::class,
             \TmrEcosystem\Sales\Infrastructure\Database\Seeders\CustomerSeeder::class,
+            \TmrEcosystem\IAM\Infrastructure\Database\Seeders\IAMSeeder::class,
         ]);
     }
 }
