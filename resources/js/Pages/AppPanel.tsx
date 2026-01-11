@@ -130,32 +130,6 @@ export default function AppPanel({ panel }: AppPanelProps) {
                 )}
             </div>
 
-            {/* Bottom System Bar */}
-            {/* <div className="mt-20 flex flex-col md:flex-row items-center justify-between p-6 bg-slate-900/5 rounded-[2rem] border border-white/50 backdrop-blur-sm">
-                <div className="flex items-center space-x-6 mb-4 md:mb-0">
-                    <div className="flex items-center px-4 py-2 bg-white rounded-full shadow-sm border border-slate-100 text-[10px] font-black uppercase tracking-widest text-green-600">
-                        <span className="w-2 h-2 rounded-full bg-green-500 mr-2 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" />
-                        {systemMessage}
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-400 flex items-center">
-                        <Icons.Clock size={14} className="mr-2" />
-                        Last Sync: {new Date().toLocaleTimeString()}
-                    </div>
-                </div>
-
-                <div className="flex items-center space-x-8">
-                    <div className="text-right">
-                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Platform</p>
-                        <p className="text-xs font-bold text-slate-800">ECOSYSTEM TMR v12.4</p>
-                    </div>
-                    <div className="h-8 w-px bg-slate-200" />
-                    <div className="text-right font-black text-xs text-slate-900">
-                        <span className="bg-primary/10 text-primary px-3 py-1.5 rounded-lg border border-primary/10">
-                            DDD ENGINE ACTIVE
-                        </span>
-                    </div>
-                </div>
-            </div> */}
         </AppPanelLayout>
     );
 }

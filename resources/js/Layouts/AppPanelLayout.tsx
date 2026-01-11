@@ -75,16 +75,6 @@ export default function AppPanelLayout({ children }: PropsWithChildren) {
             {/* Main Content Area */}
             <main className="flex-1 overflow-y-auto">
                 <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-                    {/* Welcome Header */}
-                    {/* <div className="mb-10">
-                        <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center">
-                            <LayoutGrid className="mr-3 text-primary" size={32} />
-                            ระบบบริหารจัดการส่วนกลาง
-                        </h1>
-                        <p className="text-slate-500 mt-2">ยินดีต้อนรับเข้าสู่ระบบ EcoSystem TMR กรุณาเลือกโมดูลที่ต้องการใช้งาน</p>
-                    </div> */}
-
-                    {/* Rendering the Modules Grid (Page Content) */}
                     {children}
                 </div>
             </main>
