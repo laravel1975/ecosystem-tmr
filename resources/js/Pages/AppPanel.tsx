@@ -22,37 +22,17 @@ interface AppPanelProps {
     panel: {
         data?: {
             modules: Module[];
-            system_message: string;
-            user_summary: { name: string };
         };
         modules?: Module[];
-        system_message?: string;
-        user_summary?: { name: string };
     };
 }
 
 export default function AppPanel({ panel }: AppPanelProps) {
     const modules = panel?.data?.modules ?? panel?.modules ?? [];
-    const user = panel?.data?.user_summary ?? panel?.user_summary;
-    const systemMessage = panel?.data?.system_message ?? panel?.system_message ?? 'System Synchronized';
 
     return (
         <AppPanelLayout>
             <Head title="Main Menu | EcoSystem TMR" />
-
-            {/* ส่วน Header ต้อนรับแบบ Modern Minimalist */}
-            {/* <div className="relative mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-                <div className="flex items-center space-x-2 text-primary font-bold tracking-tight text-sm uppercase mb-3">
-                    <div className="h-[2px] w-8 bg-primary rounded-full" />
-                    <span>Control Center</span>
-                </div>
-                <h1 className="text-5xl font-black text-slate-900 tracking-tighter leading-none">
-                    สวัสดี, <span className="text-transparent bg-clip-text bg-gradient-to-br from-blue-600 via-indigo-500 to-violet-500">{user?.name?.split(' ')[0] ?? 'User'}</span>
-                </h1>
-                <p className="text-slate-500 mt-4 text-lg max-w-xl font-medium leading-relaxed">
-                    ระบบบริหารจัดการแบบบูรณาการ พร้อมเชื่อมโยงข้อมูลทุกภาคส่วนให้เป็นหนึ่งเดียว
-                </p>
-            </div> */}
 
             {/* Grid Modules: ใช้ Bento Grid Style */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 animate-in fade-in zoom-in-95 duration-1000 delay-200">

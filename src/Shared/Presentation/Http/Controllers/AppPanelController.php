@@ -28,18 +28,18 @@ class AppPanelController extends Controller
                 name: 'Procurement',
                 description: 'จัดการการจัดซื้อสินค้าจากคู่ค้า',
                 icon: 'ShoppingCart',
-                route: '/purchase',
+                route: '/purchase/orders',
                 color: 'text-orange-600',
-                badge_count: 0 // อนาคต: นับ PO รอยืนยัน
+                badge_count: 8 // อนาคต: นับ PO รอยืนยัน
             ),
             new AppModuleData(
                 id: 'sales',
                 name: 'Sales & CRM',
                 description: 'บริหารจัดการคำสั่งซื้อและลูกค้าสัมพันธ์',
                 icon: 'Users2',
-                route: '/sales',
+                route: '/sales/orders',
                 color: 'text-green-600',
-                badge_count: 0
+                badge_count: 10
             ),
             new AppModuleData(
                 id: 'logistics',
