@@ -21,6 +21,7 @@ import {
     SelectValue,
 } from '@/Components/ui/select';
 import { ChevronLeft, Save } from 'lucide-react';
+import InventoryNavigation from '../Presentation/Partials/InventoryNavigation';
 
 // Types สำหรับ Props ที่รับมาจาก Controller
 interface Category {
@@ -73,6 +74,7 @@ export default function CreateItem({ categories, uoms }: Props) {
                     </Link>
                 </div>
             }
+            navigation={<InventoryNavigation />}
         >
             <Head title="Create Product" />
 

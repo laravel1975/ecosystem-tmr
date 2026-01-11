@@ -27,6 +27,7 @@ import {
     Save,
     X
 } from 'lucide-react';
+import InventoryNavigation from '../Presentation/Partials/InventoryNavigation';
 
 export default function OperationsShow({ transfer, backorder }: { transfer: any, backorder?: any }) {
 
@@ -168,6 +169,7 @@ export default function OperationsShow({ transfer, backorder }: { transfer: any,
                     </div>
                 </div>
             }
+            navigation={<InventoryNavigation />}
         >
             <Head title={`${transfer.reference}`} />
 

@@ -3,13 +3,14 @@ import { Head, Link } from '@inertiajs/react';
 import { Badge } from '@/Components/ui/badge'; // สมมติว่ามี หรือใช้ span class ปกติ
 import { Button } from '@/Components/ui/button';
 import { FileText, ArrowRight } from 'lucide-react';
+import InventoryNavigation from '../Presentation/Partials/InventoryNavigation';
 
 export default function OperationsIndex({ type, transfers }: { type: string, transfers: any }) {
 
     // Mapping ชื่อหัวข้อให้ตรงกับ 3 เมนูที่คุณต้องการ
     const titles: Record<string, string> = {
-        picking:  'Pick Operations',
-        packing:  'Pack Operations',
+        picking: 'Pick Operations',
+        packing: 'Pack Operations',
         outgoing: 'Delivery Orders',
         incoming: 'Receipts',
         internal: 'Internal Transfers'
@@ -18,7 +19,10 @@ export default function OperationsIndex({ type, transfers }: { type: string, tra
     const title = titles[type] || 'Operations';
 
     return (
-        <AuthenticatedLayout header={<h2 className="font-semibold text-xl text-gray-800">{title}</h2>}>
+        <AuthenticatedLayout
+            header={<h2 className="font-semibold text-xl text-gray-800">{title}</h2>}
+            navigation={<InventoryNavigation />}
+        >
             <Head title={title} />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -46,18 +50,17 @@ export default function OperationsIndex({ type, transfers }: { type: string, tra
                                         <td className="px-6 py-4 text-sm text-gray-500">{doc.source_location?.name}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500">{doc.destination_location?.name}</td>
                                         <td className="px-6 py-4 text-center">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                                doc.status === 'done'
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-blue-100 text-blue-800'
-                                            }`}>
+                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${doc.status === 'done'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-blue-100 text-blue-800'
+                                                }`}>
                                                 {doc.status.toUpperCase()}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <Link href={route('inventory.ops.show', doc.id)}>
                                                 <Button size="sm" variant="outline" className="text-indigo-600 border-indigo-200 hover:bg-indigo-50">
-                                                    Process <ArrowRight className="w-3 h-3 ml-1"/>
+                                                    Process <ArrowRight className="w-3 h-3 ml-1" />
                                                 </Button>
                                             </Link>
                                         </td>

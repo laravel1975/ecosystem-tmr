@@ -10,6 +10,7 @@ import {
     MapPin,
     Box
 } from 'lucide-react';
+import InventoryNavigation from './Presentation/Partials/InventoryNavigation';
 
 export default function InventoryDashboard({ stats, stocks }: { stats: any, stocks: any }) {
 
@@ -34,6 +35,7 @@ export default function InventoryDashboard({ stats, stocks }: { stats: any, stoc
     return (
         <AuthenticatedLayout
             header={<h2 className="font-semibold text-xl text-gray-800 leading-tight">Inventory Overview</h2>}
+            navigation={<InventoryNavigation />}
         >
             <Head title="Inventory Dashboard" />
 

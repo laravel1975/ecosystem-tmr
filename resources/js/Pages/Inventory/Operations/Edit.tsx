@@ -6,6 +6,7 @@ import { Input } from '@/Components/ui/input';
 import { Label } from '@/Components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/Components/ui/card';
 import { ArrowLeft, Save } from 'lucide-react';
+import InventoryNavigation from '../Presentation/Partials/InventoryNavigation';
 
 export default function OperationsEdit({ transfer }: { transfer: any }) {
 
@@ -35,7 +36,10 @@ export default function OperationsEdit({ transfer }: { transfer: any }) {
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="font-semibold text-xl text-gray-800">Edit: {transfer.reference}</h2>}>
+        <AuthenticatedLayout
+            header={<h2 className="font-semibold text-xl text-gray-800">Edit: {transfer.reference}</h2>}
+            navigation={<InventoryNavigation />}
+        >
             <Head title={`Edit ${transfer.reference}`} />
 
             <div className="py-12">
