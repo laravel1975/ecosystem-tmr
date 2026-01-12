@@ -21,7 +21,7 @@ class AppPanelController extends Controller
                 icon: 'Package',
                 route: '/inventory/dashboard',
                 color: 'text-blue-600',
-                badge_count: 0 // อนาคต: นับรายการ Stock Move ที่รอตรวจสอบ
+                badge_count: 5 // อนาคต: นับรายการ Stock Move ที่รอตรวจสอบ
             ),
             new AppModuleData(
                 id: 'procurement',
@@ -48,7 +48,7 @@ class AppPanelController extends Controller
                 icon: 'Truck',
                 route: '/logistics/shipments',
                 color: 'text-indigo-600',
-                badge_count: 0
+                badge_count: 3
             ),
             new AppModuleData(
                 id: 'hrm',
@@ -57,7 +57,7 @@ class AppPanelController extends Controller
                 icon: 'Contact',
                 route: '/hrm/employees',
                 color: 'text-rose-600',
-                badge_count: 0
+                badge_count: 7
             ),
             new AppModuleData(
                 id: 'iam',
@@ -66,7 +66,7 @@ class AppPanelController extends Controller
                 icon: 'ShieldCheck',
                 route: '/iam/users',
                 color: 'text-slate-600',
-                badge_count: 0
+                badge_count: 1
             ),
         ];
 

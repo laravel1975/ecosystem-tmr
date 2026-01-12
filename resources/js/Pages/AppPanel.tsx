@@ -80,10 +80,24 @@ export default function AppPanel({ panel }: AppPanelProps) {
                                                     {module.name}
                                                 </h3>
 
-                                                {module.badge_count > 0 && (
+                                                {/* {module.badge_count > 0 && (
                                                     <div className="relative flex h-6 w-6">
                                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                                         <Badge className="relative bg-red-500 text-white border-none h-6 min-w-[24px] px-1.5 flex justify-center items-center rounded-full text-[10px] font-black">
+                                                            {module.badge_count > 99 ? '99+' : module.badge_count}
+                                                        </Badge>
+                                                    </div>
+                                                )} */}
+                                                {module.badge_count > 0 && (
+                                                    <div className="relative flex h-6 w-6">
+                                                        <span className={cn(
+                                                            "animate-ping absolute inline-flex h-full w-full rounded-full opacity-75",
+                                                            module.color.replace('text-', 'bg-') // แปลงสี text เป็นสี bg สำหรับเอฟเฟกต์ ping
+                                                        )}></span>
+                                                        <Badge className={cn(
+                                                            "relative text-white border-none h-6 min-w-[24px] px-1.5 flex justify-center items-center rounded-full text-[10px] font-black shadow-sm",
+                                                            module.color.replace('text-', 'bg-') // นำ module.color มาใช้แทน bg-red-500
+                                                        )}>
                                                             {module.badge_count > 99 ? '99+' : module.badge_count}
                                                         </Badge>
                                                     </div>
