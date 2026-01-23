@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import AppPanelLayout from '@/Layouts/AppPanelLayout';
 import { Head, router } from '@inertiajs/react';
 import { Card, CardContent, CardFooter } from "@/Components/ui/card";
 import { Input } from "@/Components/ui/input";
@@ -7,37 +6,70 @@ import { Badge } from "@/Components/ui/badge";
 import { Button } from "@/Components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/Components/ui/dialog";
 import { CatalogItem } from '@/types/catalog';
-import { Search, ShoppingCart, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, ShoppingCart, Info } from 'lucide-react';
 import SaleNavigation from '../Partials/SaleNavigation';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import CatalogCart from '../Partials/CatalogCart'; // นำเข้าคอมโพเนนต์ตะกร้า
 
 interface Props {
     items: CatalogItem[];
     filters: { search?: string };
 }
 
+// กำหนด Interface สำหรับสินค้าในตะกร้า
+interface CartItem {
+    id: number;
+    name: string;
+    qty: number;
+    price: number;
+}
+
 export default function CatalogGallery({ items, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
+    const [cart, setCart] = useState<CartItem[]>([]);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         router.get(route('catalog.gallery'), { search }, { preserveState: true });
     };
 
+    // ฟังก์ชันเพิ่มสินค้าลงตะกร้า
+    const addToCart = (item: CatalogItem) => {
+        const defaultPrice = item.price_points[0]?.amount || 0;
+
+        // ตรวจสอบว่ามีสินค้าในตะกร้าหรือยัง ถ้ามีให้บวกจำนวนเพิ่ม
+        const existingIndex = cart.findIndex(c => c.id === item.id);
+        if (existingIndex > -1) {
+            const newCart = [...cart];
+            newCart[existingIndex].qty += 1;
+            setCart(newCart);
+        } else {
+            setCart([...cart, {
+                id: item.id,
+                name: item.name,
+                qty: 1,
+                price: defaultPrice
+            }]);
+        }
+
+        // ปิด Modal หลังจากเพิ่มลงตะกร้า (ถ้าเปิดอยู่)
+        setSelectedItem(null);
+    };
+
     return (
         <AuthenticatedLayout
-            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Product Catalog Gallery</h2>}
             navigation={<SaleNavigation />}
         >
             <Head title="Sales Catalog Gallery" />
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 pb-24"> {/* เพิ่ม padding bottom เพื่อไม่ให้ปุ่มตะกร้าบังเนื้อหา */}
                 {/* Header & Search */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Product Catalog</h2>
-                        <p className="text-muted-foreground">เลือกชมสินค้าและนำเสนอราคาแก่ลูกค้า</p>
+                        <p className="text-muted-foreground">เลือกชมสินค้าและสะสมรายการเพื่อสร้างใบเสนอราคา</p>
                     </div>
                     <form onSubmit={handleSearch} className="relative w-full md:w-96">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -76,16 +108,21 @@ export default function CatalogGallery({ items, filters }: Props) {
                                 </p>
                             </CardContent>
 
-                            <CardFooter className="p-4 pt-0 flex justify-between items-center">
+                            <CardFooter className="p-4 pt-0 flex justify-between items-center gap-2">
                                 <div className="flex flex-col">
                                     <span className="text-xs text-muted-foreground">เริ่มต้นที่</span>
-                                    <span className="text-xl font-bold text-primary">
-                                        ฿{item.price_points[0]?.amount?.toLocaleString() || 'N/A'}
+                                    <span className="text-lg font-bold text-primary">
+                                        ฿{item.price_points[0]?.amount?.toLocaleString() || '0'}
                                     </span>
                                 </div>
-                                <Button size="sm" variant="secondary" onClick={() => setSelectedItem(item)}>
-                                    <Info className="w-4 h-4 mr-2" /> รายละเอียด
-                                </Button>
+                                <div className="flex gap-1">
+                                    <Button size="icon" variant="outline" onClick={() => setSelectedItem(item)}>
+                                        <Info className="w-4 h-4" />
+                                    </Button>
+                                    <Button size="sm" onClick={() => addToCart(item)}>
+                                        <ShoppingCart className="w-4 h-4 mr-1" /> เพิ่ม
+                                    </Button>
+                                </div>
                             </CardFooter>
                         </Card>
                     ))}
@@ -103,6 +140,7 @@ export default function CatalogGallery({ items, filters }: Props) {
                                     <img
                                         src={`/storage/${selectedItem.main_image?.file_path}`}
                                         className="w-full h-full object-cover"
+                                        alt={selectedItem.name}
                                     />
                                 </div>
                                 <div className="grid grid-cols-5 gap-2">
@@ -121,8 +159,8 @@ export default function CatalogGallery({ items, filters }: Props) {
                                     <DialogHeader>
                                         <DialogTitle className="text-2xl">{selectedItem.name}</DialogTitle>
                                     </DialogHeader>
-                                    <p className="mt-4 text-muted-foreground">
-                                        {selectedItem.description}
+                                    <p className="mt-4 text-muted-foreground text-sm">
+                                        {selectedItem.description || 'ไม่มีข้อมูลรายละเอียดสินค้าเพิ่มเติม'}
                                     </p>
                                 </div>
 
@@ -130,8 +168,8 @@ export default function CatalogGallery({ items, filters }: Props) {
                                     <h4 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">ตารางราคาขาย</h4>
                                     <div className="grid gap-2">
                                         {selectedItem.price_points.map(price => (
-                                            <div key={price.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/50">
-                                                <span className="font-medium text-sm">{(price as any).price_list?.name}</span>
+                                            <div key={price.id} className="flex justify-between items-center p-3 rounded-lg bg-muted/50 border">
+                                                <span className="font-medium text-sm">{(price as any).price_list?.name || 'ราคาปกติ'}</span>
                                                 <span className="text-lg font-bold">฿{price.amount.toLocaleString()}</span>
                                             </div>
                                         ))}
@@ -139,8 +177,8 @@ export default function CatalogGallery({ items, filters }: Props) {
                                 </div>
 
                                 <div className="mt-auto flex gap-3">
-                                    <Button className="flex-1" size="lg">
-                                        <ShoppingCart className="w-4 h-4 mr-2" /> สร้างใบเสนอราคา
+                                    <Button className="flex-1" size="lg" onClick={() => addToCart(selectedItem)}>
+                                        <ShoppingCart className="w-4 h-4 mr-2" /> เพิ่มลงใบเสนอราคา
                                     </Button>
                                 </div>
                             </div>
@@ -148,6 +186,9 @@ export default function CatalogGallery({ items, filters }: Props) {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Floating Cart Component */}
+            <CatalogCart cart={cart} setCart={setCart} />
         </AuthenticatedLayout>
     );
 }

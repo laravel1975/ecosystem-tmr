@@ -22,7 +22,7 @@ export default function CatalogIndex({ items, priceLists }: Props) {
 
     return (
         <AuthenticatedLayout
-            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Price List</h2>}
             navigation={<SaleNavigation />}
         >
             <Head title="Catalog Management" />

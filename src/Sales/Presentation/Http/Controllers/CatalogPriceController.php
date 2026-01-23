@@ -48,4 +48,13 @@ class CatalogPriceController extends Controller
             'filters' => $request->only(['search'])
         ]);
     }
+
+    public function prepareQuotation(Request $request)
+    {
+        // รับข้อมูล items: [{id, qty, price_list_id}]
+        $items = $request->input('items', []);
+
+        // ส่งข้อมูลไปยังหน้า Sales Create พร้อม Flash Data
+        return redirect()->route('sales.create')->with('selected_catalog_items', $items);
+    }
 }
