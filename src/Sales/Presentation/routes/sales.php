@@ -17,4 +17,5 @@ Route::middleware(['web', 'auth', 'verified'])
         // เส้นทางสำหรับจัดการราคา Catalog
         Route::get('/catalog-prices', [CatalogPriceController::class, 'index'])->name('catalog.prices.index');
         Route::post('/catalog-prices/update', [CatalogPriceController::class, 'updatePrice'])->name('catalog.prices.update');
+        Route::get('/catalog-gallery', [CatalogPriceController::class, 'gallery'])->name('catalog.gallery');
     });

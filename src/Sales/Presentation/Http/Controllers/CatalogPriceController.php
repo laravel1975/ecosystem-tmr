@@ -31,4 +31,21 @@ class CatalogPriceController extends Controller
 
         return back()->with('success', 'อัปเดตราคาเรียบร้อยแล้ว');
     }
+
+    public function gallery(Request $request)
+    {
+        // ดึงข้อมูลสินค้าพร้อมรูปหลัก และราคา (กรองเอาเฉพาะที่มีรูปและ Active)
+        $items = InventoryItem::with(['mainImage', 'images', 'pricePoints.priceList'])
+            ->where('is_active', true)
+            ->when($request->search, function ($query, $search) {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('sku', 'like', "%{$search}%");
+            })
+            ->get();
+
+        return Inertia::render('Sales/Catalog/Gallery', [
+            'items' => $items,
+            'filters' => $request->only(['search'])
+        ]);
+    }
 }
