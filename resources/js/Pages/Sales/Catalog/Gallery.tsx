@@ -8,6 +8,8 @@ import { Button } from "@/Components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/Components/ui/dialog";
 import { CatalogItem } from '@/types/catalog';
 import { Search, ShoppingCart, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import SaleNavigation from '../Partials/SaleNavigation';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 interface Props {
     items: CatalogItem[];
@@ -24,7 +26,10 @@ export default function CatalogGallery({ items, filters }: Props) {
     };
 
     return (
-        <AppPanelLayout>
+        <AuthenticatedLayout
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}
+            navigation={<SaleNavigation />}
+        >
             <Head title="Sales Catalog Gallery" />
 
             <div className="p-6 space-y-6">
@@ -143,6 +148,6 @@ export default function CatalogGallery({ items, filters }: Props) {
                     )}
                 </DialogContent>
             </Dialog>
-        </AppPanelLayout>
+        </AuthenticatedLayout>
     );
 }

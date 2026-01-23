@@ -9,6 +9,8 @@ import { CatalogItem, PriceList } from '@/types/catalog';
 import ItemImageManager from '../Partials/ItemImageManager';
 import PricePointManager from '../Partials/PricePointManager';
 import { Image as ImageIcon, Tag, Package } from 'lucide-react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import SaleNavigation from '../Partials/SaleNavigation';
 
 interface Props {
     items: CatalogItem[];
@@ -19,7 +21,10 @@ export default function CatalogIndex({ items, priceLists }: Props) {
     const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(items[0] || null);
 
     return (
-        <AppPanelLayout>
+        <AuthenticatedLayout
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}
+            navigation={<SaleNavigation />}
+        >
             <Head title="Catalog Management" />
 
             <div className="grid grid-cols-12 gap-6 p-6">
@@ -106,6 +111,6 @@ export default function CatalogIndex({ items, priceLists }: Props) {
                     )}
                 </div>
             </div>
-        </AppPanelLayout>
+        </AuthenticatedLayout>
     );
 }

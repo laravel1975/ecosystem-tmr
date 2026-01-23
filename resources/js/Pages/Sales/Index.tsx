@@ -2,10 +2,14 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/Components/ui/button';
 import { Plus, Search, FileText } from 'lucide-react';
+import SaleNavigation from './Partials/SaleNavigation';
 
 export default function SalesIndex({ orders }: { orders: any }) {
     return (
-        <AuthenticatedLayout header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}>
+        <AuthenticatedLayout
+            header={<h2 className="font-semibold text-xl text-gray-800 dark:text-gray-200">Sales Orders</h2>}
+            navigation={<SaleNavigation />}
+        >
             <Head title="Sales Orders" />
             <div className="py-12">
                 <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
@@ -18,7 +22,7 @@ export default function SalesIndex({ orders }: { orders: any }) {
                         </div>
                         <Link href={route('sales.orders.create')}>
                             <Button className="bg-indigo-600 hover:bg-indigo-700">
-                                <Plus className="w-4 h-4 mr-2"/> Create Quotation
+                                <Plus className="w-4 h-4 mr-2" /> Create Quotation
                             </Button>
                         </Link>
                     </div>
@@ -52,13 +56,12 @@ export default function SalesIndex({ orders }: { orders: any }) {
                                             {Number(order.total_amount).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full border ${
-                                                order.status === 'confirmed'
-                                                    ? 'bg-blue-100 text-blue-800 border-blue-200'
-                                                    : order.status === 'draft'
-                                                        ? 'bg-gray-100 text-gray-800 border-gray-200'
-                                                        : 'bg-green-100 text-green-800 border-green-200'
-                                            }`}>
+                                            <span className={`px-2.5 py-0.5 text-xs font-medium rounded-full border ${order.status === 'confirmed'
+                                                ? 'bg-blue-100 text-blue-800 border-blue-200'
+                                                : order.status === 'draft'
+                                                    ? 'bg-gray-100 text-gray-800 border-gray-200'
+                                                    : 'bg-green-100 text-green-800 border-green-200'
+                                                }`}>
                                                 {order.status.toUpperCase()}
                                             </span>
                                         </td>
