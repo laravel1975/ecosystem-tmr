@@ -24,4 +24,19 @@ class InventoryItem extends Model
     {
         return $this->hasMany(StockQuant::class, 'item_id');
     }
+
+    public function images()
+    {
+        return $this->hasMany(InventoryItemImage::class, 'inventory_item_id')->orderBy('sort_order');
+    }
+
+    public function mainImage()
+    {
+        return $this->hasOne(InventoryItemImage::class, 'inventory_item_id')->where('is_main', true);
+    }
+
+    public function pricePoints()
+    {
+        return $this->hasMany(\TmrEcosystem\Sales\Infrastructure\Persistence\Eloquent\Models\PricePoint::class, 'inventory_item_id');
+    }
 }

@@ -6,6 +6,7 @@ use TmrEcosystem\Inventory\Presentation\Http\Controllers\ItemController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\StockMovementController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\OperationsController;
 use TmrEcosystem\Inventory\Presentation\Http\Controllers\TransferPrintController;
+use TmrEcosystem\Inventory\Presentation\Http\Controllers\ItemImageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +21,10 @@ Route::middleware(['web', 'auth', 'verified']) // กำหนด Middleware ท
     ->prefix('inventory')                      // กำหนด Prefix URL (เช่น /inventory/dashboard)
     ->name('inventory.')                       // กำหนด Prefix Name (เช่น inventory.dashboard)
     ->group(function () {
+
+        Route::post('/items/{item}/images', [ItemImageController::class, 'store'])->name('items.images.store');
+        Route::delete('/images/{image}', [ItemImageController::class, 'destroy'])->name('items.images.destroy');
+        Route::patch('/images/{image}/set-main', [ItemImageController::class, 'setMain'])->name('items.images.set-main');
 
         // Dashboard: /inventory
         Route::get('/dashboard', [InventoryDashboardController::class, 'index'])->name('dashboard');
