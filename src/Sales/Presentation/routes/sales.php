@@ -2,12 +2,16 @@
 
 use Illuminate\Support\Facades\Route;
 use TmrEcosystem\Sales\Presentation\Http\Controllers\CatalogPriceController;
+use TmrEcosystem\Sales\Presentation\Http\Controllers\SalesDashboardController;
 use TmrEcosystem\Sales\Presentation\Http\Controllers\SalesOrderController;
 
 Route::middleware(['web', 'auth', 'verified'])
     ->prefix('sales')
     ->name('sales.')
     ->group(function () {
+
+        Route::get('/dashboard', [SalesDashboardController::class, 'index'])->name('dashboard');
+
         Route::get('/orders', [SalesOrderController::class, 'index'])->name('orders.index');
         Route::get('/orders/create', [SalesOrderController::class, 'create'])->name('orders.create');
         Route::post('/orders', [SalesOrderController::class, 'store'])->name('orders.store');

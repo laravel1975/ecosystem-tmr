@@ -6,7 +6,7 @@ export default function SaleNavigation() {
     return (
         <>
             {/* สำหรับ Desktop จะเรียงแนวนอน | สำหรับ Mobile จะเรียงแนวตั้งโดยอัตโนมัติจาก Layout */}
-            <NavLink href={route('sales.orders.index')} active={route().current('sales.orders.index')}>
+            <NavLink href={route('sales.dashboard')} active={route().current('sales.dashboard')}>
                 Overview
             </NavLink>
 
